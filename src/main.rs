@@ -46,6 +46,9 @@ fn main() {
                 } else { zone_toggle = false; }
                 println!("Turning system {} {}", zone_state.id, zone_toggle);
             }
+            Cli::Sys(sys_opts) => {
+                println!("{:?}",sys_opts);
+            }
             _ => (),
         }
     }
