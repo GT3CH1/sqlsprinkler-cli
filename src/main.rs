@@ -63,11 +63,13 @@ fn main() {
             // Parses the "zone" sub command
             Cli::Zone(zone_state) => {
                 let mut zone_toggle: bool = false;
-                if zone_state.state == "on" {
-                    zone_toggle = true;
-                } else { zone_toggle = false; }
+
+                if zone_state.state == "on" { zone_toggle = true; } else { zone_toggle = false; }
+                if zone_state.id <= 0 { panic!("ID must be greater than 0"); }
+
                 let zones = GetZones(pool);
-                println!("Turning system {} {}", zones[usize::from(zone_state.id) - 1].name, zone_toggle);
+                println!("Turning system {:?}", zones[usize::from(zone_state.id) - 1]);
+                //TODO: Make the GPIO pin turn on.
             }
             Cli::Sys(sys_opts) => {
                 println!("{:?}", sys_opts);
