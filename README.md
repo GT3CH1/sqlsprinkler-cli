@@ -24,3 +24,13 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 * [ ] Implement `sqlsprinkler-cli sys run`
 * [ ] Implement `sqlsprinkler-cli sys winterize`
 * [ ] Implement `sqlsprinkler-cli sys <on,off>`
+
+## Dependencies
+* rust >= 1.53.0
+* structopt 0.3.13
+* mysql 16.1.0
+
+## How-to-use
+* Export your SQL password as an environment variable called `SQL_PASS`
+  - ie, `export SQL_PASS='password123'`
+* run your given sqlsprinkler command, and enjoy!
