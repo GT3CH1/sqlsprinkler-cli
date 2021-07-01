@@ -1,3 +1,5 @@
+mod database;
+
 // Copyright 2021 Gavin Pease
 use std::env;
 use structopt::StructOpt;
