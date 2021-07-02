@@ -10,6 +10,10 @@ pub struct Opts {
     #[structopt(short = "v", parse(from_occurrences))]
     verbosity: u8,
 
+    /// Launches the SQLSprinkler API web daemon.
+    #[structopt(short = "w", long = "daemon", about = "Launches the SQLSprinkler API web daemon")]
+    daemon_mode: bool,
+
     // SUBCOMMANDS
     #[structopt(subcommand)]
     commands: Option<Cli>,
@@ -52,6 +56,12 @@ struct SysStatus {
 }
 fn main() {
     let cli = Opts::from_args();
+
+    //TODO: Parse other command line options
+    if cli.daemon_mode {
+        println!("Daemon mode...");
+    }
+
     // Get the SQL database password, parse it.
     let key = "SQL_PASS";
     let mut pass = "".to_string();
