@@ -17,6 +17,16 @@ pub struct Zone {
     pub id: i8,
 }
 
+/// Object representing toggling the zone.
+/// # Params
+///     * `id` The ID of the zone as it pertains in the database
+///     * `state` The state to set the GPIO pin (true for on, false for off)
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ZoneToggle {
+    pub id: i8,
+    pub state: bool
+}
+
 #[derive(Clone)]
 struct ZoneList {
     zone_list: Arc<RwLock<Zones>>

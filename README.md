@@ -23,8 +23,9 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 * [ ] Implement SQLSprinkler web api
   * [x] Get system schedule status → `GET /system/status` 
   * [x] Update system schedule status → `PUT /system/status ` → `{"system_status": status}`
-  * [ ] Get zone status → `GET /zone/info`
+  * [x] Get zone status → `GET /zone/info`
   * [ ] Toggle zone → `PUT /zone` → `{"id": id, "state": state}`
+    - Currently, partially implemented, no GPIO pins will be toggled as of 07-02-2021
   * [ ] Update zone information
   * [ ] Create zone
   * [ ] Delete zone
