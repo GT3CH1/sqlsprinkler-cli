@@ -33,6 +33,7 @@ enum SysOpts {
     Off,
     Run,
     Winterize,
+    Status,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -44,7 +45,10 @@ struct Zone {
     auto_off: bool,
     system_order: i8,
 }
-
+#[derive(Debug, PartialEq, Eq)]
+struct SysStatus {
+    status: bool,
+}
 fn main() {
     let cli = Opts::from_args();
     let key = "SQL_PASS";
@@ -72,7 +76,29 @@ fn main() {
                 //TODO: Make the GPIO pin turn on.
             }
             Cli::Sys(sys_opts) => {
-                println!("{:?}", sys_opts);
+                match sys_opts {
+                    SysOpts::On => {
+                        println!("Enabling system schedule.");
+                        SetSystem(pool, true);
+                    }
+                    SysOpts::Off => {
+                        println!("Disabling system schedule.");
+                        SetSystem(pool, false);
+                    }
+                    SysOpts::Run => {
+                        println!("Running the system schedule.")
+                    }
+                    SysOpts::Winterize => {
+                        println!("Winterizing the system.");
+                    }
+                    SysOpts::Status => {
+                        let status = match GetSystemStatus(pool) {
+                            true => "enabled",
+                            false => "disabled",
+                        };
+                        println!("The system is {}", status);
+                    }
+                }
             }
             _ => (),
         }
@@ -96,4 +122,33 @@ fn GetZones(pool: Pool) -> Vec<Zone> {
                 }).collect()
             }).unwrap();
     return all_zones;
+}
+
+/// Enables or disables the system schedule
+/// # Arguments
+///     * `pool` The SQL connection pool used to toggle the system.
+///     * `enabled` If true is passed in, the system is enabled. If false is used, the system is disabled.
+fn SetSystem(pool: Pool, enabled: bool) {
+    let query = format!("UPDATE Enabled set enabled = {}", enabled);
+    pool.prep_exec(query, ()).unwrap();
+}
+
+/// Gets whether the system schedule is enabled or disabled
+/// # Arguments
+///     * `pool` The SQL connection pool used to toggle the system.
+/// # Return
+///     * `bool` True if the system is enabled, false if not.
+fn GetSystemStatus(pool: Pool) -> bool {
+    let query = format!("SELECT enabled FROM Enabled");
+    let sys_status: Vec<SysStatus> =
+        pool.prep_exec(query, ())
+            .map(|result| {
+                result.map(|x| x.unwrap()).map(|row| {
+                    let (status) = mysql::from_row(row);
+                    SysStatus {
+                        status
+                    }
+                }).collect()
+            }).unwrap();
+    return sys_status[0].status;
 }
