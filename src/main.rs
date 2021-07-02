@@ -75,7 +75,7 @@ fn main() {
                 zone_toggle = zone_state.state == "on";
                 if zone_state.id <= 0 { panic!("ID must be greater than 0"); }
                 let zone_id = usize::from(zone_state.id) - 1;
-                let zones = GetZones(pool);
+                let zones = get_zones(pool);
                 let my_zone = zones[zone_id].borrow();
                 println!("Turning zone {} {:?}", zone_id, my_zone);
                 //TODO: Make the GPIO pin turn on.
@@ -85,11 +85,11 @@ fn main() {
                 match sys_opts {
                     SysOpts::On => {
                         println!("Enabling system schedule.");
-                        SetSystem(pool, true);
+                        set_system(pool, true);
                     }
                     SysOpts::Off => {
                         println!("Disabling system schedule.");
-                        SetSystem(pool, false);
+                        set_system(pool, false);
                     }
                     SysOpts::Run => {
                         println!("Running the system schedule.")
@@ -98,7 +98,7 @@ fn main() {
                         println!("Winterizing the system.");
                     }
                     SysOpts::Status => {
-                        let status = match GetSystemStatus(pool) {
+                        let status = match get_system_status(pool) {
                             true => "enabled",
                             false => "disabled",
                         };
@@ -115,7 +115,7 @@ fn main() {
 ///     * `pool` The SQL connection pool to use to query for zones
 /// # Returns
 ///     * `Vec<Zone>` A list of all the zones in the database.
-fn GetZones(pool: Pool) -> Vec<Zone> {
+fn get_zones(pool: Pool) -> Vec<Zone> {
     let all_zones: Vec<Zone> =
         pool.prep_exec("SELECT Name, Gpio, Runtime, Enabled, AutoOff, SystemOrder from Zones", ())
             .map(|result| {
@@ -138,7 +138,7 @@ fn GetZones(pool: Pool) -> Vec<Zone> {
 /// # Arguments
 ///     * `pool` The SQL connection pool used to toggle the system.
 ///     * `enabled` If true is passed in, the system is enabled. If false is used, the system is disabled.
-fn SetSystem(pool: Pool, enabled: bool) {
+fn set_system(pool: Pool, enabled: bool) {
     let query = format!("UPDATE Enabled set enabled = {}", enabled);
     pool.prep_exec(query, ()).unwrap();
 }
@@ -148,7 +148,7 @@ fn SetSystem(pool: Pool, enabled: bool) {
 ///     * `pool` The SQL connection pool used to toggle the system.
 /// # Return
 ///     * `bool` True if the system is enabled, false if not.
-fn GetSystemStatus(pool: Pool) -> bool {
+fn get_system_status(pool: Pool) -> bool {
     let query = format!("SELECT enabled FROM Enabled");
     let sys_status: Vec<SysStatus> =
         pool.prep_exec(query, ())
