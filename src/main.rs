@@ -1,5 +1,5 @@
 mod daemon;
-
+mod zone;
 // Copyright 2021 Gavin Pease
 use std::env;
 use structopt::StructOpt;
@@ -45,16 +45,6 @@ enum SysOpts {
     Run,
     Winterize,
     Status,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-struct Zone {
-    name: String,
-    gpio: i8,
-    time: i8,
-    enabled: bool,
-    auto_off: bool,
-    system_order: i8,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -138,19 +128,20 @@ fn get_pool() -> Pool {
 ///     * `pool` The SQL connection pool to use to query for zones
 /// # Returns
 ///     * `Vec<Zone>` A list of all the zones in the database.
-fn get_zones(pool: Pool) -> Vec<Zone> {
-    let all_zones: Vec<Zone> =
-        pool.prep_exec("SELECT Name, Gpio, Runtime, Enabled, AutoOff, SystemOrder from Zones", ())
+fn get_zones(pool: Pool) -> Vec< zone::Zone> {
+    let all_zones: Vec<zone::Zone> =
+        pool.prep_exec("SELECT Name, Gpio, Runtime, Enabled, AutoOff, SystemOrder, ID from Zones", ())
             .map(|result| {
                 result.map(|x| x.unwrap()).map(|row| {
-                    let (name, gpio, time, enabled, auto_off, system_order) = mysql::from_row(row);
-                    Zone {
+                    let (name, gpio, time, enabled, auto_off, system_order, id) = mysql::from_row(row);
+                    zone::Zone {
                         name,
                         gpio,
                         time,
                         enabled,
                         auto_off,
                         system_order,
+                        id,
                     }
                 }).collect()
             }).unwrap();
