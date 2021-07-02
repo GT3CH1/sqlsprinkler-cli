@@ -35,7 +35,6 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 * rust >= 1.53.0
 * structopt 0.3.13
 * mysql 16.1.0
-* serde_json
 * tokio 1.0
 * warp 0.3
 * parking_lot 0.10.0
