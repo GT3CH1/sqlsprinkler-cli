@@ -3,6 +3,8 @@ use mysql::*;
 use std::env;
 use structopt::StructOpt;
 use std::borrow::Borrow;
+use mysql::*;
+use serde_json::*;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "example", about = "how to use struct-opt crate")]
@@ -13,6 +15,10 @@ pub struct Opts {
     /// Launches the SQLSprinkler API web daemon.
     #[structopt(short = "w", long = "daemon", about = "Launches the SQLSprinkler API web daemon")]
     daemon_mode: bool,
+
+    /// Output everything in JSON.
+    #[structopt(long = "json")]
+    json_output: bool,
 
     // SUBCOMMANDS
     #[structopt(subcommand)]
@@ -56,11 +62,8 @@ struct SysStatus {
 }
 fn main() {
     let cli = Opts::from_args();
-
-    //TODO: Parse other command line options
-    if cli.daemon_mode {
-        println!("Daemon mode...");
-    }
+    let daemon_mode = cli.daemon_mode;
+    let json_output = cli.json_output;
 
     // Get the SQL database password, parse it.
     let key = "SQL_PASS";
