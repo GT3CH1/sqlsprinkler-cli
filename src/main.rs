@@ -2,6 +2,7 @@ use mysql::*;
 // Copyright 2021 Gavin Pease
 use std::env;
 use structopt::StructOpt;
+use std::borrow::Borrow;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "example", about = "how to use struct-opt crate")]
