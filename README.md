@@ -21,6 +21,14 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 * [ ] Implement `sqlsprinkler-cli sys winterize`
 * [ ] Implement `sqlsprinkler-cli sys <on,off>`
 * [ ] Implement SQLSprinkler web api
+  * [x] Get system schedule status → `GET /system/status` 
+  * [x] Update system schedule status → `PUT /system/status ` → `{"system_status": status}`
+  * [ ] Get zone status → `GET /zone/info`
+  * [ ] Toggle zone → `PUT /zone` → `{"id": id, "state": state}`
+  * [ ] Update zone information
+  * [ ] Create zone
+  * [ ] Delete zone
+  * [ ] Change zone ordering
 
 ## Dependencies
 * rust >= 1.53.0
@@ -29,6 +37,7 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 * serde_json
 * tokio 1.0
 * warp 0.3
+* parking_lot 0.10.0
 
 ## How-to-use
 * Export your SQL password as an environment variable called `SQL_PASS`
