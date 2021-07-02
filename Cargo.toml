@@ -12,3 +12,4 @@ mysql = "16.1.0"
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 warp = "0.3"
+parking_lot = "0.10.0"
