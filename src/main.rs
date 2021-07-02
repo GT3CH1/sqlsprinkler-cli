@@ -51,12 +51,15 @@ struct SysStatus {
 }
 fn main() {
     let cli = Opts::from_args();
+    // Get the SQL database password, parse it.
     let key = "SQL_PASS";
     let mut pass = "".to_string();
     match env::var(key) {
         Ok(val) => pass = val,
-        Err(e) => println!("{}", e)
+        Err(e) => panic!("{}", e),
     }
+
+    // Build the url for the connection
     let mut url = "mysql://sqlsprinkler:".to_owned();
     url.push_str(pass.as_str());
     url.push_str("@web.peasenet.com:3306/SQLSprinkler");
@@ -64,17 +67,19 @@ fn main() {
     let pool = mysql::Pool::new(url).unwrap();
     if let Some(subcommand) = cli.commands {
         match subcommand {
-            // Parses the "zone" sub command
+            // Parses the zone sub command, make sure that id is greater than 0.
             Cli::Zone(zone_state) => {
                 let mut zone_toggle: bool = false;
 
-                if zone_state.state == "on" { zone_toggle = true; } else { zone_toggle = false; }
+                zone_toggle = zone_state.state == "on";
                 if zone_state.id <= 0 { panic!("ID must be greater than 0"); }
-
+                let zone_id = usize::from(zone_state.id) - 1;
                 let zones = GetZones(pool);
-                println!("Turning system {:?}", zones[usize::from(zone_state.id) - 1]);
+                let my_zone = zones[zone_id].borrow();
+                println!("Turning zone {} {:?}", zone_id, my_zone);
                 //TODO: Make the GPIO pin turn on.
             }
+            // Parses the zone sub command
             Cli::Sys(sys_opts) => {
                 match sys_opts {
                     SysOpts::On => {
@@ -100,11 +105,15 @@ fn main() {
                     }
                 }
             }
-            _ => (),
         }
     }
 }
 
+/// Gets a list of all the zones in this database
+/// # Arguments
+///     * `pool` The SQL connection pool to use to query for zones
+/// # Returns
+///     * `Vec<Zone>` A list of all the zones in the database.
 fn GetZones(pool: Pool) -> Vec<Zone> {
     let all_zones: Vec<Zone> =
         pool.prep_exec("SELECT Name, Gpio, Runtime, Enabled, AutoOff, SystemOrder from Zones", ())
