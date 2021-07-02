@@ -6,19 +6,32 @@ use serde::{Serialize, Deserialize};
 struct SysStatus {
     state: bool,
 }
+impl SysStatus {
+    fn new() -> Self {
+        SysStatus {
+            state: false,
+        }
+    }
+}
+
 
 #[tokio::main]
 pub(crate) async fn run() {
+
+    let sys_stat = SysStatus::new();
+    let sys_stat_filter = warp::any().map(move || sys_stat.clone());
     let get_sys_status = warp::get()
         .and(warp::path("system"))
         .and(warp::path("state"))
         .and(warp::path::end())
+        .and(sys_stat_filter.clone())
         .and_then(get_sys_status);
 
     let set_sys_status = warp::post()
         .and(warp::path("system"))
         .and(warp::path("state"))
         .and(warp::path::end())
+        .and(sys_stat_filter.clone())
         .and(post_json())
         .and_then(set_sys_status);
 
@@ -30,7 +43,7 @@ fn post_json() -> impl Filter<Extract=(SysStatus, ), Error=warp::Rejection> + Cl
     warp::body::content_length_limit(1024 * 16).and(warp::body::json())
 }
 
-async fn get_sys_status() -> Result<impl warp::Reply, warp::Rejection> {
+async fn get_sys_status(status: SysStatus) -> Result<impl warp::Reply, warp::Rejection> {
     let value = get_system_status(get_pool());
     Ok(warp::reply::json(&value))
 }
