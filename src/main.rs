@@ -1,10 +1,10 @@
-use mysql::*;
+mod daemon;
+
 // Copyright 2021 Gavin Pease
 use std::env;
 use structopt::StructOpt;
 use std::borrow::Borrow;
-use mysql::*;
-use serde_json::*;
+use mysql::Pool;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "example", about = "how to use struct-opt crate")]
@@ -56,29 +56,20 @@ struct Zone {
     auto_off: bool,
     system_order: i8,
 }
+
 #[derive(Debug, PartialEq, Eq)]
 struct SysStatus {
     status: bool,
 }
+
 fn main() {
     let cli = Opts::from_args();
     let daemon_mode = cli.daemon_mode;
     let json_output = cli.json_output;
-
-    // Get the SQL database password, parse it.
-    let key = "SQL_PASS";
-    let mut pass = "".to_string();
-    match env::var(key) {
-        Ok(val) => pass = val,
-        Err(e) => panic!("{}", e),
+    if daemon_mode {
+        daemon::run();
     }
-
-    // Build the url for the connection
-    let mut url = "mysql://sqlsprinkler:".to_owned();
-    url.push_str(pass.as_str());
-    url.push_str("@web.peasenet.com:3306/SQLSprinkler");
-
-    let pool = mysql::Pool::new(url).unwrap();
+    let pool = get_pool();
     if let Some(subcommand) = cli.commands {
         match subcommand {
             // Parses the zone sub command, make sure that id is greater than 0.
@@ -97,7 +88,6 @@ fn main() {
             Cli::Sys(sys_opts) => {
                 match sys_opts {
                     SysOpts::On => {
-                        println!("Enabling system schedule.");
                         set_system(pool, true);
                     }
                     SysOpts::Off => {
@@ -111,16 +101,36 @@ fn main() {
                         println!("Winterizing the system.");
                     }
                     SysOpts::Status => {
-                        let status = match get_system_status(pool) {
-                            true => "enabled",
-                            false => "disabled",
-                        };
-                        println!("The system is {}", status);
+                        let system_status = get_system_status(pool);
+                        if !json_output {
+                            let output = match system_status {
+                                true => "enabled",
+                                false => "disabled",
+                            };
+                            println!("The system is {}", output);
+                        }
                     }
                 }
             }
         }
     }
+}
+
+fn get_pool() -> Pool {
+    // Get the SQL database password, parse it.
+    let key = "SQL_PASS";
+    let mut pass = "".to_string();
+    match env::var(key) {
+        Ok(val) => pass = val,
+        Err(e) => panic!("{}", e),
+    }
+    // Build the url for the connection
+    let mut url = "mysql://sqlsprinkler:".to_owned();
+    url.push_str(pass.as_str());
+    url.push_str("@web.peasenet.com:3306/SQLSprinkler");
+
+    let pool = mysql::Pool::new(url).unwrap();
+    return pool;
 }
 
 /// Gets a list of all the zones in this database
