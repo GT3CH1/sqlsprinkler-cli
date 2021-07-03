@@ -71,13 +71,21 @@ pub(crate) async fn run() {
         .and(zone_json())
         .and_then(_update_zone);
 
+    let update_order = warp::put()
+        .and(warp::path("zone"))
+        .and(warp::path("order"))
+        .and(warp::path::end())
+        .and(order_json())
+        .and_then(_update_order);
+
     let routes = get_sys_status
         .or(set_sys_status)
         .or(get_zone_status)
         .or(set_zone_status)
         .or(add_zone)
         .or(delete_zone)
-        .or(update_zone);
+        .or(update_zone)
+        .or(update_order);
     warp::serve(routes)
         .run(([127, 0, 0, 1], 3030))
         .await;
@@ -109,6 +117,12 @@ fn zone_delete_json() -> impl Filter<Extract=(zone::ZoneDelete, ), Error=warp::R
 
 /// Used to filter a put request to update a zone.
 fn zone_json() -> impl Filter<Extract=(zone::Zone, ), Error=warp::Rejection> + Clone {
+    warp::body::content_length_limit(1024 * 16)
+        .and(warp::body::json())
+}
+
+/// Used to filter a put request to re-order the system
+fn order_json() -> impl Filter<Extract=(Vec<i8>, ), Error=warp::Rejection> + Clone {
     warp::body::content_length_limit(1024 * 16)
         .and(warp::body::json())
 }
@@ -188,4 +202,9 @@ async fn _delete_zone(_zone: zone::ZoneDelete) -> Result<impl warp::Reply, warp:
 async fn _update_zone(_zone: zone::Zone) -> Result<impl warp::Reply, warp::Rejection> {
     update_zone(_zone);
     Ok(warp::reply::with_status("Updated zone", http::StatusCode::OK))
+}
+
+async fn _update_order(_order: Vec<i8>) -> Result<impl warp::Reply, warp::Rejection> {
+    println!("{:?}", _order);
+    Ok(warp::reply::json(&_order))
 }
