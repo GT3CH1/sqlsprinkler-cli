@@ -27,7 +27,13 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
   * [ ] Toggle zone → `PUT /zone` → `{"id": id, "state": state}`
     - Currently, partially implemented, no GPIO pins will be toggled as of 07-02-2021
   * [ ] Update zone information
-  * [ ] Create zone
+  * [x] Create zone → `POST /zone` → `{
+    "name": "Rust-Zone",
+    "gpio": 12,
+    "time": 10,
+    "auto_off": true,
+    "enabled": true
+    }`
   * [ ] Delete zone
   * [ ] Change zone ordering
 

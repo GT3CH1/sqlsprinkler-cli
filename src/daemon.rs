@@ -1,4 +1,4 @@
-use crate::{get_pool, get_system_status, set_system, get_zones, zone};
+use crate::{get_pool, get_system_status, set_system, get_zones, zone, add_new_zone};
 use warp::{Filter, http};
 use serde::{Serialize, Deserialize};
 
@@ -49,10 +49,18 @@ pub(crate) async fn run() {
         .and(zone_status_put_json())
         .and_then(set_zone_status);
 
+    // Handles post request to /zone -> Used for CREATING a new zone.
+    let add_zone = warp::post()
+        .and(warp::path("zone"))
+        .and(warp::path::end())
+        .and(zone_post_json())
+        .and_then(_add_zone);
+
     let routes = get_sys_status
         .or(set_sys_status)
         .or(get_zone_status)
-        .or(set_zone_status);
+        .or(set_zone_status)
+        .or(add_zone);
     warp::serve(routes)
         .run(([127, 0, 0, 1], 3030))
         .await;
@@ -66,6 +74,12 @@ fn sys_status_put_json() -> impl Filter<Extract=(SysStatus, ), Error=warp::Rejec
 
 /// Used to filter a put request to toggle a specific zone.
 fn zone_status_put_json() -> impl Filter<Extract=(zone::ZoneToggle, ), Error=warp::Rejection> + Clone {
+    warp::body::content_length_limit(1024 * 16)
+        .and(warp::body::json())
+}
+
+/// Used to filter a post request to add a new zone.
+fn zone_post_json() -> impl Filter<Extract=(zone::ZoneAdd, ), Error=warp::Rejection> + Clone {
     warp::body::content_length_limit(1024 * 16)
         .and(warp::body::json())
 }
@@ -120,4 +134,12 @@ async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, wa
         //TODO: Turn off the GPIO pin
     }
     Ok(warp::reply::with_status(format!("Setting {} to {}", id, state), http::StatusCode::OK))
+}
+
+/// Adds a new zone to the system
+/// # Params
+///     * `_zone` The new zone we are wanting to add to the system.
+async fn _add_zone(_zone: zone::ZoneAdd) -> Result<impl warp::Reply, warp::Rejection> {
+    add_new_zone(_zone);
+    Ok(warp::reply::with_status("Adding zone", http::StatusCode::CREATED))
 }

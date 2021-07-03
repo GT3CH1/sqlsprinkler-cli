@@ -1,5 +1,6 @@
 mod daemon;
 mod zone;
+
 // Copyright 2021 Gavin Pease
 use std::env;
 use structopt::StructOpt;
@@ -128,7 +129,7 @@ fn get_pool() -> Pool {
 ///     * `pool` The SQL connection pool to use to query for zones
 /// # Returns
 ///     * `Vec<Zone>` A list of all the zones in the database.
-fn get_zones(pool: Pool) -> Vec< zone::Zone> {
+fn get_zones(pool: Pool) -> Vec<zone::Zone> {
     let all_zones: Vec<zone::Zone> =
         pool.prep_exec("SELECT Name, Gpio, Runtime, Enabled, AutoOff, SystemOrder, ID from Zones", ())
             .map(|result| {
@@ -175,4 +176,15 @@ fn get_system_status(pool: Pool) -> bool {
                 }).collect()
             }).unwrap();
     return sys_status[0].status;
+}
+
+/// Adds a new zone
+/// # Params
+///     * `_zone` The new zone we want to add.
+fn add_new_zone(_zone: zone::ZoneAdd) {
+    let pool = get_pool();
+    let query = format!("INSERT into `Zones` (`Name`, `Gpio`, `Runtime`, `AutoOff`, `Enabled`) VALUES \
+     ( '{}','{}','{}',{},{} )", _zone.name, _zone.gpio, _zone.time, _zone.auto_off, _zone.enabled);
+    println!("{}",query);
+    pool.prep_exec(query,());
 }

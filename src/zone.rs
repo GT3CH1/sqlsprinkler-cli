@@ -27,6 +27,16 @@ pub struct ZoneToggle {
     pub state: bool
 }
 
+/// Used when we are creating a new zone from an api response.
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ZoneAdd {
+    pub name: String,
+    pub gpio: i8,
+    pub time: i8,
+    pub enabled: bool,
+    pub auto_off: bool,
+}
+
 #[derive(Clone)]
 struct ZoneList {
     zone_list: Arc<RwLock<Zones>>
