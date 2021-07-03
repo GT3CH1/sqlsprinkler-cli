@@ -27,6 +27,14 @@ pub struct ZoneToggle {
     pub state: bool
 }
 
+/// Used when are deleting a new zone via api
+/// # Params
+///     *   `id` The ID in the database that we are going to delete
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ZoneDelete {
+    pub id: i8,
+}
+
 /// Used when we are creating a new zone from an api response.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ZoneAdd {

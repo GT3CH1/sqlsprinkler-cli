@@ -1,4 +1,4 @@
-use crate::{get_pool, get_system_status, set_system, get_zones, zone, add_new_zone};
+use crate::{get_pool, get_system_status, set_system, get_zones, zone, add_new_zone, delete_zone};
 use warp::{Filter, http};
 use serde::{Serialize, Deserialize};
 
@@ -56,11 +56,19 @@ pub(crate) async fn run() {
         .and(zone_post_json())
         .and_then(_add_zone);
 
+    // Handles delete requests to /zone -> Used to DELETE a zone.
+    let delete_zone = warp::delete()
+        .and(warp::path("zone"))
+        .and(warp::path::end())
+        .and(zone_delete_json())
+        .and_then(_delete_zone);
+
     let routes = get_sys_status
         .or(set_sys_status)
         .or(get_zone_status)
         .or(set_zone_status)
-        .or(add_zone);
+        .or(add_zone)
+        .or(delete_zone);
     warp::serve(routes)
         .run(([127, 0, 0, 1], 3030))
         .await;
@@ -83,6 +91,13 @@ fn zone_post_json() -> impl Filter<Extract=(zone::ZoneAdd, ), Error=warp::Reject
     warp::body::content_length_limit(1024 * 16)
         .and(warp::body::json())
 }
+
+/// Used to filter a delete request to delete a new zone.
+fn zone_delete_json() -> impl Filter<Extract=(zone::ZoneDelete, ), Error=warp::Rejection> + Clone {
+    warp::body::content_length_limit(1024 * 16)
+        .and(warp::body::json())
+}
+
 
 /// Gets the system status
 /// # Returns
@@ -142,4 +157,12 @@ async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, wa
 async fn _add_zone(_zone: zone::ZoneAdd) -> Result<impl warp::Reply, warp::Rejection> {
     add_new_zone(_zone);
     Ok(warp::reply::with_status("Adding zone", http::StatusCode::CREATED))
+}
+
+/// Deletes a zone
+/// # Params
+///     * `_zone` The zone we are wanting to delete.
+async fn _delete_zone(_zone: zone::ZoneDelete) -> Result<impl warp::Reply, warp::Rejection> {
+    delete_zone(_zone);
+    Ok(warp::reply::with_status("Deleted zone", http::StatusCode::OK))
 }

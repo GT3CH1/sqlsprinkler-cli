@@ -188,3 +188,12 @@ fn add_new_zone(_zone: zone::ZoneAdd) {
     println!("{}",query);
     pool.prep_exec(query,());
 }
+
+/// Deletes the given zone
+/// # Params
+///     * `_zone` The zone we are deleting
+fn delete_zone(_zone: zone::ZoneDelete) {
+    let pool = get_pool();
+    let query = format!("DELETE FROM `Zones` WHERE id = {}",_zone.id);
+    pool.prep_exec(query,());
+}

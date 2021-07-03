@@ -34,7 +34,9 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
     "auto_off": true,
     "enabled": true
     }`
-  * [ ] Delete zone
+  * [x] Delete zone → ` DELETE /zone` → `{
+    "id": 1
+    }`
   * [ ] Change zone ordering
 
 ## Dependencies
