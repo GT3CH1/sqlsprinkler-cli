@@ -131,7 +131,7 @@ fn get_pool() -> Pool {
 ///     * `Vec<Zone>` A list of all the zones in the database.
 fn get_zones(pool: Pool) -> Vec<zone::Zone> {
     let all_zones: Vec<zone::Zone> =
-        pool.prep_exec("SELECT Name, Gpio, Runtime, Enabled, AutoOff, SystemOrder, ID from Zones", ())
+        pool.prep_exec("SELECT Name, Gpio, Runtime, Enabled, AutoOff, SystemOrder, ID from Zones ORDER BY SystemOrder", ())
             .map(|result| {
                 result.map(|x| x.unwrap()).map(|row| {
                     let (name, gpio, time, enabled, auto_off, system_order, id) = mysql::from_row(row);
