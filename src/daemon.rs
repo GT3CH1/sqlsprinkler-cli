@@ -1,4 +1,4 @@
-use crate::{get_pool, get_system_status, set_system, get_zones, zone, add_new_zone, delete_zone};
+use crate::{get_pool, get_system_status, set_system, get_zones, zone, add_new_zone, delete_zone, update_zone};
 use warp::{Filter, http};
 use serde::{Serialize, Deserialize};
 
@@ -63,12 +63,21 @@ pub(crate) async fn run() {
         .and(zone_delete_json())
         .and_then(_delete_zone);
 
+    //  Handles put requests to /zone -> Used to UPDATE a zone.
+    let update_zone = warp::put()
+        .and(warp::path("zone"))
+        .and(warp::path("update"))
+        .and(warp::path::end())
+        .and(zone_json())
+        .and_then(_update_zone);
+
     let routes = get_sys_status
         .or(set_sys_status)
         .or(get_zone_status)
         .or(set_zone_status)
         .or(add_zone)
-        .or(delete_zone);
+        .or(delete_zone)
+        .or(update_zone);
     warp::serve(routes)
         .run(([127, 0, 0, 1], 3030))
         .await;
@@ -94,6 +103,12 @@ fn zone_post_json() -> impl Filter<Extract=(zone::ZoneAdd, ), Error=warp::Reject
 
 /// Used to filter a delete request to delete a new zone.
 fn zone_delete_json() -> impl Filter<Extract=(zone::ZoneDelete, ), Error=warp::Rejection> + Clone {
+    warp::body::content_length_limit(1024 * 16)
+        .and(warp::body::json())
+}
+
+/// Used to filter a put request to update a zone.
+fn zone_json() -> impl Filter<Extract=(zone::Zone, ), Error=warp::Rejection> + Clone {
     warp::body::content_length_limit(1024 * 16)
         .and(warp::body::json())
 }
@@ -165,4 +180,12 @@ async fn _add_zone(_zone: zone::ZoneAdd) -> Result<impl warp::Reply, warp::Rejec
 async fn _delete_zone(_zone: zone::ZoneDelete) -> Result<impl warp::Reply, warp::Rejection> {
     delete_zone(_zone);
     Ok(warp::reply::with_status("Deleted zone", http::StatusCode::OK))
+}
+
+/// Updates a zone
+/// # Params
+///     * `_zone` The zone we want to update.
+async fn _update_zone(_zone: zone::Zone) -> Result<impl warp::Reply, warp::Rejection> {
+    update_zone(_zone);
+    Ok(warp::reply::with_status("Updated zone", http::StatusCode::OK))
 }

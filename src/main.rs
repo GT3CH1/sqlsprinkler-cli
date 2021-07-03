@@ -185,7 +185,6 @@ fn add_new_zone(_zone: zone::ZoneAdd) {
     let pool = get_pool();
     let query = format!("INSERT into `Zones` (`Name`, `Gpio`, `Runtime`, `AutoOff`, `Enabled`) VALUES \
      ( '{}','{}','{}',{},{} )", _zone.name, _zone.gpio, _zone.time, _zone.auto_off, _zone.enabled);
-    println!("{}",query);
     pool.prep_exec(query,());
 }
 
@@ -195,5 +194,15 @@ fn add_new_zone(_zone: zone::ZoneAdd) {
 fn delete_zone(_zone: zone::ZoneDelete) {
     let pool = get_pool();
     let query = format!("DELETE FROM `Zones` WHERE id = {}",_zone.id);
+    pool.prep_exec(query,());
+}
+
+/// Updates a zone with the given id to the values contained in this new zone.
+/// # Params
+///     * `_zone` The zone containing the same id, but new information.
+fn update_zone(_zone: zone::Zone){
+    let pool = get_pool();
+    let query = format!("UPDATE Zones SET Name='{}', Gpio={}, Runtime={},AutoOff={},Enabled={},SystemOrder={} WHERE ID={}"
+    ,_zone.name,_zone.gpio,_zone.time,_zone.auto_off,_zone.enabled,_zone.system_order,_zone.id);
     pool.prep_exec(query,());
 }

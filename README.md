@@ -26,7 +26,15 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
   * [x] Get zone status → `GET /zone/info`
   * [ ] Toggle zone → `PUT /zone` → `{"id": id, "state": state}`
     - Currently, partially implemented, no GPIO pins will be toggled as of 07-02-2021
-  * [ ] Update zone information
+  * [x] Update zone information → `PUT /zone/info` → `{
+    "name": "Rust-Zone 123",
+    "gpio": 12,
+    "time": 10,
+    "auto_off": true,
+    "enabled": true,
+    "system_order": 1,
+    "id": 4
+    }`
   * [x] Create zone → `POST /zone` → `{
     "name": "Rust-Zone",
     "gpio": 12,
@@ -38,6 +46,7 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
     "id": 1
     }`
   * [ ] Change zone ordering
+    * Might not be needed - See update zone syntax
 
 ## Dependencies
 * rust >= 1.53.0
