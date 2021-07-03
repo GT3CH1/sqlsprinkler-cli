@@ -1,7 +1,11 @@
+// Copyright 2021 Gavin Pease
+
 mod daemon;
 mod zone;
 
-// Copyright 2021 Gavin Pease
+extern crate sysfs_gpio;
+
+use sysfs_gpio::{Direction, Pin};
 use std::env;
 use structopt::StructOpt;
 use std::borrow::Borrow;

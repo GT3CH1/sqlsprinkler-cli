@@ -56,6 +56,7 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 * tokio 1.0
 * warp 0.3
 * parking_lot 0.10.0
+* rppal 0.12.0
 
 ## How-to-use
 

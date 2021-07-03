@@ -13,3 +13,4 @@ serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 warp = "0.3"
 parking_lot = "0.10.0"
+rppal = "0.12.0"
