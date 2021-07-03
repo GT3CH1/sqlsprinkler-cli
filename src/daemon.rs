@@ -1,6 +1,7 @@
 use crate::{get_pool, get_system_status, set_system, get_zones, zone, add_new_zone, delete_zone, update_zone};
-use warp::{Filter, http};
+use warp::{Filter, http, reject};
 use serde::{Serialize, Deserialize};
+use std::borrow::Borrow;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct SysStatus {
@@ -15,6 +16,10 @@ impl SysStatus {
     }
 }
 
+#[derive(Debug)]
+struct LengthMismatch;
+
+impl reject::Reject for LengthMismatch {}
 
 #[tokio::main]
 pub(crate) async fn run() {
@@ -71,6 +76,7 @@ pub(crate) async fn run() {
         .and(zone_json())
         .and_then(_update_zone);
 
+    // Handles put requests to /zone/order -> Used to UPDATE the ordering of the system
     let update_order = warp::put()
         .and(warp::path("zone"))
         .and(warp::path("order"))
@@ -87,7 +93,7 @@ pub(crate) async fn run() {
         .or(update_zone)
         .or(update_order);
     warp::serve(routes)
-        .run(([127, 0, 0, 1], 3030))
+        .run(([0, 0, 0, 0], 3030))
         .await;
 }
 
@@ -205,6 +211,26 @@ async fn _update_zone(_zone: zone::Zone) -> Result<impl warp::Reply, warp::Rejec
 }
 
 async fn _update_order(_order: Vec<i8>) -> Result<impl warp::Reply, warp::Rejection> {
-    println!("{:?}", _order);
-    Ok(warp::reply::json(&_order))
+    let zone_list = get_zones(get_pool());
+    let mut counter  = 0;
+    if zone_list.len() == _order.len() {
+        for i in &_order {
+            let index = counter as usize;
+            let curr_zone = zone::Zone::from(zone_list.get(index).as_deref().unwrap());
+            let zone_updated_order = zone::Zone {
+                name: curr_zone.name,
+                gpio: curr_zone.gpio,
+                time: curr_zone.time,
+                enabled: curr_zone.enabled,
+                auto_off: curr_zone.auto_off,
+                system_order: *i,
+                id: curr_zone.id,
+            };
+            counter = counter + 1;
+            update_zone(zone_updated_order);
+        }
+        Ok(warp::reply::json(&_order))
+    }else{
+        Err(warp::reject::custom(LengthMismatch))
+    }
 }

@@ -1,10 +1,13 @@
 # sqlsprinkler-cli
+
 A command line interface for the SQLSprinkler project
 
 ## Authors & Contributers
+
 - Gavin Pease
 
 ## Usage
+
 sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified program.
 
 * `sqlsprinkler-cli`
@@ -13,42 +16,40 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
     - Turn the given zone on or off
 * `sqlsprinkler-cli sys <on,off,winterize,run,status>`
     - Operate on the system.
-    
+
 ## TODO
+
 * [ ] Implement `sqlsprinkler-cli`
 * [ ] Implement `sqlsprinkler-cli zone <id> <on,off>`
 * [ ] Implement `sqlsprinkler-cli sys run`
 * [ ] Implement `sqlsprinkler-cli sys winterize`
 * [ ] Implement `sqlsprinkler-cli sys <on,off>`
 * [ ] Implement SQLSprinkler web api
-  * [x] Get system schedule status → `GET /system/status` 
-  * [x] Update system schedule status → `PUT /system/status ` → `{"system_status": status}`
-  * [x] Get zone status → `GET /zone/info`
-  * [ ] Toggle zone → `PUT /zone` → `{"id": id, "state": state}`
-    - Currently, partially implemented, no GPIO pins will be toggled as of 07-02-2021
-  * [x] Update zone information → `PUT /zone/info` → `{
-    "name": "Rust-Zone 123",
-    "gpio": 12,
-    "time": 10,
-    "auto_off": true,
-    "enabled": true,
-    "system_order": 1,
-    "id": 4
-    }`
-  * [x] Create zone → `POST /zone` → `{
-    "name": "Rust-Zone",
-    "gpio": 12,
-    "time": 10,
-    "auto_off": true,
-    "enabled": true
-    }`
-  * [x] Delete zone → ` DELETE /zone` → `{
-    "id": 1
-    }`
-  * [ ] Change zone ordering
-    * Might not be needed - See update zone syntax
+    * [x] Get system schedule status → `GET /system/status`
+    * [x] Update system schedule status → `PUT /system/status ` → `{"system_status": status}`
+    * [x] Get zone status → `GET /zone/info`
+    * [ ] Toggle zone → `PUT /zone` → `{"id": id, "state": state}`
+        - Currently, partially implemented, no GPIO pins will be toggled as of 07-02-2021
+    * [x] Update zone information → `PUT /zone/info` → `{
+      "name": "Rust-Zone 123",
+      "gpio": 12,
+      "time": 10,
+      "auto_off": true,
+      "enabled": true,
+      "system_order": 1,
+      "id": 4 }`
+    * [x] Create zone → `POST /zone` → `{
+      "name": "Rust-Zone",
+      "gpio": 12,
+      "time": 10,
+      "auto_off": true,
+      "enabled": true }`
+    * [x] Delete zone → ` DELETE /zone` → `{
+      "id": 1 }`
+    * [x] Change zone ordering → `PUT /zone/order` → `[0,1,2,3]`
 
 ## Dependencies
+
 * rust >= 1.53.0
 * structopt 0.3.13
 * mysql 16.1.0
@@ -57,6 +58,7 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 * parking_lot 0.10.0
 
 ## How-to-use
+
 * Export your SQL password as an environment variable called `SQL_PASS`
-  - ie, `export SQL_PASS='password123'`
+    - ie, `export SQL_PASS='password123'`
 * run your given sqlsprinkler command, and enjoy!

@@ -2,6 +2,7 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 use serde::{Serialize, Deserialize};
+use std::convert::From;
 
 type Zones = Vec<Zone>;
 
@@ -17,6 +18,20 @@ pub struct Zone {
     pub id: i8,
 }
 
+impl From<&Zone> for Zone {
+    fn from(item: &Zone) -> Self {
+        Zone {
+            name: (*item.name).parse().unwrap(),
+            gpio: item.gpio,
+            time: item.time,
+            enabled: item.enabled,
+            auto_off: item.auto_off,
+            system_order: item.system_order,
+            id: item.id
+        }
+    }
+}
+
 /// Object representing toggling the zone.
 /// # Params
 ///     * `id` The ID of the zone as it pertains in the database
@@ -24,7 +39,7 @@ pub struct Zone {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ZoneToggle {
     pub id: i8,
-    pub state: bool
+    pub state: bool,
 }
 
 /// Used when are deleting a new zone via api
@@ -47,7 +62,7 @@ pub struct ZoneAdd {
 
 #[derive(Clone)]
 struct ZoneList {
-    zone_list: Arc<RwLock<Zones>>
+    zone_list: Arc<RwLock<Zones>>,
 }
 
 /// The list of zones from the database
