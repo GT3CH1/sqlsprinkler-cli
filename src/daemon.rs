@@ -1,17 +1,17 @@
-use crate::{get_pool, get_system_status, set_system, get_zones, zone, add_new_zone, delete_zone, update_zone};
+use crate::{get_pool, get_system_status, set_system, get_zones, zone, add_new_zone, delete_zone, update_zone, set_pin_zone, turn_off_all_pins, get_pin_state};
 use warp::{Filter, http, reject};
 use serde::{Serialize, Deserialize};
 use std::borrow::Borrow;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct SysStatus {
-    system_status: bool,
+    system_enabled: bool,
 }
 
 impl SysStatus {
     fn new() -> Self {
         SysStatus {
-            system_status: true,
+            system_enabled: true,
         }
     }
 }
@@ -128,7 +128,7 @@ fn zone_json() -> impl Filter<Extract=(zone::Zone, ), Error=warp::Rejection> + C
 }
 
 /// Used to filter a put request to re-order the system
-fn order_json() -> impl Filter<Extract=(Vec<i8>, ), Error=warp::Rejection> + Clone {
+fn order_json() -> impl Filter<Extract=(zone::ZoneOrder, ), Error=warp::Rejection> + Clone {
     warp::body::content_length_limit(1024 * 16)
         .and(warp::body::json())
 }
@@ -139,7 +139,7 @@ fn order_json() -> impl Filter<Extract=(Vec<i8>, ), Error=warp::Rejection> + Clo
 ///     * `json` A json object representing the current state of the system schedule.
 async fn get_sys_status() -> Result<impl warp::Reply, warp::Rejection> {
     let value = SysStatus {
-        system_status: get_system_status(get_pool())
+        system_enabled: get_system_status(get_pool())
     };
     Ok(warp::reply::json(&value))
 }
@@ -148,42 +148,40 @@ async fn get_sys_status() -> Result<impl warp::Reply, warp::Rejection> {
 /// # Params
 ///     * `_status` The SysStatus object containing the value we are going to set the system status to.
 async fn set_sys_status(_status: SysStatus) -> Result<impl warp::Reply, warp::Rejection> {
-    set_system(get_pool(), _status.system_status);
-    println!("{}", _status.system_status);
+    set_system(get_pool(), _status.system_enabled);
+    println!("{}", _status.system_enabled);
     Ok(warp::reply::with_status("Success", http::StatusCode::OK))
 }
 
 /// Gets the status of all the zones.
 async fn get_zone_status() -> Result<impl warp::Reply, warp::Rejection> {
     let zone_list: Vec<zone::Zone> = get_zones(get_pool());
-    Ok(warp::reply::json(&zone_list))
+    let mut zone_status_list: Vec<zone::ZoneWithState> = Vec::new();
+    for zone in zone_list.iter() {
+        let _zone = zone::Zone::from(zone);
+        let _zone_with_status = zone::ZoneWithState{
+            name: _zone.name,
+            gpio: _zone.gpio,
+            time: _zone.time,
+            enabled: _zone.enabled,
+            auto_off: _zone.auto_off,
+            system_order: _zone.system_order,
+            state: get_pin_state(_zone.gpio as u8),
+            id: _zone.id
+        };
+        zone_status_list.push(_zone_with_status);
+    }
+    Ok(warp::reply::json(&zone_status_list))
 }
 
 /// Sets the id of the zone to the given state -> IE, turning on a zone.
 async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, warp::Rejection> {
     let id = _zone.id;
     let state = _zone.state;
-    let mut gpio = -1;
-
-    let zone_list = get_zones(get_pool());
-    for zone in zone_list.iter() {
-        if zone.id == id {
-            gpio = zone.gpio;
-            println!("Found zone with gpio {}", gpio);
-            break;
-        }
-    }
-
-    // If we did not find a gpio pin, we need to throw an error.
-    if gpio == -1 {
-        //TODO: Error somehow?
-    }
-    if state {
-        //TODO: Turn on the GPIO pin
-    } else {
-        //TODO: Turn off the GPIO pin
-    }
-    Ok(warp::reply::with_status(format!("Setting {} to {}", id, state), http::StatusCode::OK))
+    let zone_to_toggle = zone::Zone::from(get_zones(get_pool()).get(id as usize).unwrap());
+    turn_off_all_pins();
+    set_pin_zone(zone_to_toggle, state);
+    Ok(warp::reply::with_status(format!("Setting {}", state), http::StatusCode::OK))
 }
 
 /// Adds a new zone to the system
@@ -210,11 +208,11 @@ async fn _update_zone(_zone: zone::Zone) -> Result<impl warp::Reply, warp::Rejec
     Ok(warp::reply::with_status("Updated zone", http::StatusCode::OK))
 }
 
-async fn _update_order(_order: Vec<i8>) -> Result<impl warp::Reply, warp::Rejection> {
+async fn _update_order(_order: zone::ZoneOrder) -> Result<impl warp::Reply, warp::Rejection> {
     let zone_list = get_zones(get_pool());
-    let mut counter  = 0;
-    if zone_list.len() == _order.len() {
-        for i in &_order {
+    let mut counter = 0;
+    if zone_list.len() == _order.order.len() {
+        for i in _order.order.iter() {
             let index = counter as usize;
             let curr_zone = zone::Zone::from(zone_list.get(index).as_deref().unwrap());
             let zone_updated_order = zone::Zone {
@@ -226,11 +224,12 @@ async fn _update_order(_order: Vec<i8>) -> Result<impl warp::Reply, warp::Reject
                 system_order: *i,
                 id: curr_zone.id,
             };
+            println!("{}",i);
             counter = counter + 1;
             update_zone(zone_updated_order);
         }
         Ok(warp::reply::json(&_order))
-    }else{
+    } else {
         Err(warp::reject::custom(LengthMismatch))
     }
 }

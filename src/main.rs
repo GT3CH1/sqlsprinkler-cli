@@ -3,13 +3,13 @@
 mod daemon;
 mod zone;
 
-extern crate sysfs_gpio;
-
-use sysfs_gpio::{Direction, Pin};
-use std::env;
 use structopt::StructOpt;
 use std::borrow::Borrow;
 use mysql::Pool;
+use rppal::gpio::Gpio;
+use rppal::system::DeviceInfo;
+use std::env;
+use std::error::Error;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "example", about = "how to use struct-opt crate")]
@@ -72,12 +72,12 @@ fn main() {
                 let mut zone_toggle: bool = false;
 
                 zone_toggle = zone_state.state == "on";
-                if zone_state.id <= 0 { panic!("ID must be greater than 0"); }
-                let zone_id = usize::from(zone_state.id) - 1;
+                if zone_state.id < 0 { panic!("ID must be greater or equal to 0"); }
+                let zone_id = usize::from(zone_state.id) ;
                 let zones = get_zones(pool);
                 let my_zone = zones[zone_id].borrow();
                 println!("Turning zone {} {:?}", zone_id, my_zone);
-                //TODO: Make the GPIO pin turn on.
+                set_pin(my_zone.gpio as u8, zone_toggle);
             }
             // Parses the zone sub command
             Cli::Sys(sys_opts) => {
@@ -114,15 +114,23 @@ fn main() {
 fn get_pool() -> Pool {
     // Get the SQL database password, parse it.
     let key = "SQL_PASS";
+    let mut user = "".to_string();
     let mut pass = "".to_string();
-    match env::var(key) {
+    let mut host = "".to_string();
+    match env::var("SQL_PASS") {
         Ok(val) => pass = val,
-        Err(e) => panic!("{}", e),
+        Err(e) => println!("{}", e),
+    }
+    match env::var("SQL_HOST") {
+        Ok(val) => host = val,
+        Err(e) => println!("{}", e),
+    }
+    match env::var("SQL_USER") {
+        Ok(val) => user = val,
+        Err(e) => println!("{}", e),
     }
     // Build the url for the connection
-    let mut url = "mysql://sqlsprinkler:".to_owned();
-    url.push_str(pass.as_str());
-    url.push_str("@web.peasenet.com:3306/SQLSprinkler");
+    let mut url = format!("mysql://{}:{}@{}:3306/SQLSprinkler",user.as_str(),pass.as_str(),host.as_str());
 
     let pool = mysql::Pool::new(url).unwrap();
     return pool;
@@ -135,7 +143,7 @@ fn get_pool() -> Pool {
 ///     * `Vec<Zone>` A list of all the zones in the database.
 fn get_zones(pool: Pool) -> Vec<zone::Zone> {
     let all_zones: Vec<zone::Zone> =
-        pool.prep_exec("SELECT Name, Gpio, Runtime, Enabled, AutoOff, SystemOrder, ID from Zones ORDER BY SystemOrder", ())
+        pool.prep_exec("SELECT Name, Gpio, Time, Enabled, AutoOff, SystemOrder, ID from Zones ORDER BY SystemOrder", ())
             .map(|result| {
                 result.map(|x| x.unwrap()).map(|row| {
                     let (name, gpio, time, enabled, auto_off, system_order, id) = mysql::from_row(row);
@@ -187,7 +195,7 @@ fn get_system_status(pool: Pool) -> bool {
 ///     * `_zone` The new zone we want to add.
 fn add_new_zone(_zone: zone::ZoneAdd) {
     let pool = get_pool();
-    let query = format!("INSERT into `Zones` (`Name`, `Gpio`, `Runtime`, `AutoOff`, `Enabled`) VALUES \
+    let query = format!("INSERT into `Zones` (`Name`, `Gpio`, `Time`, `AutoOff`, `Enabled`) VALUES \
      ( '{}','{}','{}',{},{} )", _zone.name, _zone.gpio, _zone.time, _zone.auto_off, _zone.enabled);
     pool.prep_exec(query, ());
 }
@@ -206,8 +214,9 @@ fn delete_zone(_zone: zone::ZoneDelete) {
 ///     * `_zone` The zone containing the same id, but new information.
 fn update_zone(_zone: zone::Zone) {
     let pool = get_pool();
-    let query = format!("UPDATE Zones SET Name='{}', Gpio={}, Runtime={},AutoOff={},Enabled={},SystemOrder={} WHERE ID={}"
+    let query = format!("UPDATE Zones SET Name='{}', Gpio={}, Time={},AutoOff={},Enabled={},SystemOrder={} WHERE ID={}"
                         , _zone.name, _zone.gpio, _zone.time, _zone.auto_off, _zone.enabled, _zone.system_order, _zone.id);
+    println!("{}",query);
     pool.prep_exec(query, ());
 }
 
@@ -226,4 +235,47 @@ fn change_zone_ordering(order: i8, zone: zone::Zone) {
        id: zone.id
    };
     update_zone(new_zone_order);
+}
+
+/// Turns the given pin on or off
+/// # Params
+///     * `pin` The pin we want to control
+///     * `state` True if we want the pin to turn on, false otherwise.
+fn set_pin(pin: u8, state: bool) -> Result<(), Box<dyn Error>>{
+    let mut gpio = Gpio::new()?.get(pin).unwrap().into_output();
+    if state {
+        gpio.set_low();
+    } else {
+        gpio.set_high();
+    }
+    Ok(())
+}
+
+/// Sets the given zones gpio to the state we want
+/// # Params
+///     * `zone` The zone we want to control
+///     * `state` The state we want the pin to be at - true for on, false for off.
+fn set_pin_zone(zone: zone::Zone, state: bool){
+    // Ensure all the pins are turned off.
+    set_pin(zone.gpio as u8, state);
+}
+
+/// Turns off all the pins in the system
+fn turn_off_all_pins() {
+    let zone_list = get_zones(get_pool());
+    for zone_in_list in &zone_list {
+        let zone = zone::Zone::from(zone_in_list);
+        set_pin(zone.gpio as u8,false);
+    }
+}
+
+/// Get the gpio state
+/// # Params
+///      * `zone` The zone we want to get the state of.
+/// # Return
+///     * `bool` Whether or not the pin is set to low.
+fn get_pin_state(pin: u8) -> bool {
+    let gpio = Gpio::new().unwrap();
+    let mut gpio = gpio.get(pin).unwrap().into_output();
+    return gpio.is_set_low();
 }

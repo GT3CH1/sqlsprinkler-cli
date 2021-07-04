@@ -42,6 +42,11 @@ pub struct ZoneToggle {
     pub state: bool,
 }
 
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ZoneOrder {
+    pub order: Vec<i8>,
+}
+
 /// Used when are deleting a new zone via api
 /// # Params
 ///     *   `id` The ID in the database that we are going to delete
@@ -58,6 +63,18 @@ pub struct ZoneAdd {
     pub time: i8,
     pub enabled: bool,
     pub auto_off: bool,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ZoneWithState {
+    pub name: String,
+    pub gpio: i8,
+    pub time: i8,
+    pub enabled: bool,
+    pub auto_off: bool,
+    pub system_order: i8,
+    pub state: bool,
+    pub id: i8,
 }
 
 #[derive(Clone)]
