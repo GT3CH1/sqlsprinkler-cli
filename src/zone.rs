@@ -107,6 +107,8 @@ pub fn run_zone(zone: Zone, auto_off: bool) {
     if auto_off {
         thread::spawn(move || {
             let run_time = time::Duration::from_secs((_zone.time * 60) as u64);
+            println!("{}",run_time.as_secs());
+
             thread::sleep(run_time);
             set_pin_zone(_zone.borrow(), false);
         });

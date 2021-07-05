@@ -49,13 +49,13 @@ enum ZoneOptsArgs {
 }
 
 impl FromStr for ZoneOptsArgs {
-    type  Err = ();
+    type Err = ();
     fn from_str(input: &str) -> Result<ZoneOptsArgs, Self::Err> {
         match input {
-            "on"  => Ok(ZoneOptsArgs::On),
-            "off"  => Ok(ZoneOptsArgs::Off),
-            "run"  => Ok(ZoneOptsArgs::Run),
-            _      => Err(()),
+            "on" => Ok(ZoneOptsArgs::On),
+            "off" => Ok(ZoneOptsArgs::Off),
+            "run" => Ok(ZoneOptsArgs::Run),
+            _ => Err(()),
         }
     }
 }
