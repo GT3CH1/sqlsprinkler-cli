@@ -4,11 +4,10 @@ mod daemon;
 mod zone;
 
 use structopt::StructOpt;
-use std::borrow::Borrow;
-use mysql::Pool;
 use rppal::gpio::Gpio;
-use rppal::system::DeviceInfo;
 use std::{error::Error, env, thread, time};
+use crate::zone::{Zone};
+use mysql::Pool;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "example", about = "how to use struct-opt crate")]
@@ -63,7 +62,7 @@ fn main() {
     if daemon_mode {
         daemon::run();
     }
-    let pool = get_pool();
+    let zoneList = zone::get_zones();
     if let Some(subcommand) = cli.commands {
         match subcommand {
             // Parses the zone sub command, make sure that id is greater than 0.
@@ -72,10 +71,11 @@ fn main() {
 
                 zone_toggle = zone_state.state == "on";
                 if zone_state.id < 0 { panic!("ID must be greater or equal to 0"); }
-                let zone_id = usize::from(zone_state.id);
-                let zones = zone::get_zones();
-                let my_zone = zones[zone_id].borrow();
+                let id = usize::from(zone_state.id);
+                let _zoneList = zoneList;
+                let my_zone: &Zone = zoneList.zones.get(id).unwrap();
                 zone::run_zone(my_zone, my_zone.auto_off);
+
             }
             // Parses the zone sub command
             Cli::Sys(sys_opts) => {
@@ -120,7 +120,6 @@ fn main() {
 ///     `Pool` A connection to the SQL database.
 fn get_pool() -> Pool {
     // Get the SQL database password, parse it.
-    let key = "SQL_PASS";
     let mut user = "".to_string();
     let mut pass = "".to_string();
     let mut host = "".to_string();
@@ -137,7 +136,7 @@ fn get_pool() -> Pool {
         Err(e) => println!("{}", e),
     }
     // Build the url for the connection
-    let mut url = format!("mysql://{}:{}@{}:3306/SQLSprinkler", user.as_str(), pass.as_str(), host.as_str());
+    let url = format!("mysql://{}:{}@{}:3306/SQLSprinkler", user.as_str(), pass.as_str(), host.as_str());
 
     let pool = mysql::Pool::new(url).unwrap();
     return pool;
@@ -165,7 +164,7 @@ fn get_system_status() -> bool {
         pool.prep_exec(query, ())
             .map(|result| {
                 result.map(|x| x.unwrap()).map(|row| {
-                    let (status) = mysql::from_row(row);
+                    let status = mysql::from_row(row);
                     SysStatus {
                         status
                     }
@@ -191,7 +190,7 @@ fn set_pin(pin: u8, state: bool) -> Result<(), Box<dyn Error>> {
 /// Turns off all the pins in the system
 fn turn_off_all_pins() {
     let zone_list = zone::get_zones();
-    for zone_in_list in &zone_list {
+    for zone_in_list in &zone_list.zones {
         zone::set_pin_zone(zone_in_list, false);
     }
 }
@@ -203,7 +202,7 @@ fn turn_off_all_pins() {
 ///     * `bool` Whether or not the pin is set to low.
 fn get_pin_state(pin: u8) -> bool {
     let gpio = Gpio::new().unwrap();
-    let mut gpio = gpio.get(pin).unwrap().into_output();
+    let gpio = gpio.get(pin).unwrap().into_output();
     return gpio.is_set_low();
 }
 
@@ -212,7 +211,7 @@ fn run_system() {
     let zone_list = zone::get_zones();
     println!("Running system");
     thread::spawn(move || {
-        for zone in &zone_list {
+        for zone in &zone_list.zones {
             if zone.enabled {
                 zone::set_pin_zone(zone, true);
                 let run_time = time::Duration::from_secs((zone.time * 60) as u64);

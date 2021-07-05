@@ -1,11 +1,8 @@
-use parking_lot::RwLock;
-use std::collections::HashMap;
-use std::sync::Arc;
 use serde::{Serialize, Deserialize};
 use std::convert::From;
 use std::{thread, time};
 use crate::{set_pin, get_pool};
-use mysql::Pool;
+use std::borrow::Borrow;
 
 type Zones = Vec<Zone>;
 
@@ -61,7 +58,7 @@ pub struct ZoneDelete {
 /// Used when we are creating a new zone from an api response.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ZoneAdd {
-    pub name:  String,
+    pub name: String,
     pub gpio: i8,
     pub time: i8,
     pub enabled: bool,
@@ -70,7 +67,7 @@ pub struct ZoneAdd {
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ZoneWithState {
-    pub name:  String,
+    pub name: String,
     pub gpio: i8,
     pub time: i8,
     pub enabled: bool,
@@ -78,6 +75,19 @@ pub struct ZoneWithState {
     pub system_order: i8,
     pub state: bool,
     pub id: i8,
+}
+
+pub struct ZoneList {
+    pub zones: Vec<Zone>,
+}
+
+impl ZoneList {
+    pub fn new() -> Self {
+        ZoneList { zones: Vec::new() }
+    }
+    pub fn insert(&mut self, zone: Zone) {
+        self.zones.push(zone);
+    }
 }
 
 /// "Runs" the given zone, by turning it on for its specified run-time. USES A NEW THREAD.
@@ -96,6 +106,40 @@ pub fn run_zone(zone: &'static Zone, auto_off: bool) {
             let run_time = time::Duration::from_secs((_zone.time * 60) as u64);
             thread::sleep(run_time);
             set_pin_zone(_zone, false);
+        });
+    }
+}
+
+/// # Params
+///     * `pin` the GPIO pin we want to turn on.
+///     * `auto_off` Whether or not we want to automatically turn off the system -> true for yes, false for no.
+pub fn run_zone_pin(zone_id: i8) {
+    //TODO: I swear this needs to be easier some how but I don't know how
+    let zone_list = get_zones();
+    let mut _zone: Zone = Zone {
+        name: "".to_string(),
+        gpio: 0,
+        time: 0,
+        enabled: false,
+        auto_off: false,
+        system_order: 0,
+        id: 0,
+    };
+    for zone in zone_list.zones.iter() {
+        if zone_id == zone.id {
+            _zone = Zone::from(zone);
+        }
+    }
+    if !_zone.enabled {
+        println!("Zone is not enabled!");
+        return;
+    }
+    set_pin_zone(_zone.borrow(), true);
+    if _zone.auto_off {
+        thread::spawn(move || {
+            let run_time = time::Duration::from_secs((_zone.time * 60) as u64);
+            thread::sleep(run_time);
+            set_pin_zone(_zone.borrow(), false);
         });
     }
 }
@@ -165,24 +209,28 @@ pub(crate) fn add_new_zone(_zone: ZoneAdd) {
 ///     * `pool` The SQL connection pool to use to query for zones
 /// # Returns
 ///     * `Vec<Zone>` A list of all the zones in the database.
-pub(crate) fn get_zones() -> Vec<Zone> {
+pub(crate) fn get_zones() -> ZoneList {
     let pool = get_pool();
     let mut conn = pool.get_conn().unwrap();
     let rows = conn
         .query("SELECT Name, Gpio, Time, Enabled, AutoOff, SystemOrder, ID from Zones ORDER BY SystemOrder")
         .unwrap();
-    let mut zone_list = vec![];
-    for row in &rows {
+    let mut zoneList: Vec<Zone> = none;
+    for row in rows {
+        let _row = row.unwrap();
         let zone = Zone {
-            name: row[0],
-            gpio: row[1],
-            time: row[2],
-            enabled: row[3],
-            auto_off: row[4],
-            system_order: row[5],
-            id: row[6],
+            name: _row.get(0).unwrap(),
+            gpio: _row.get(1).unwrap(),
+            time: _row.get(2).unwrap(),
+            enabled: _row.get(3).unwrap(),
+            auto_off: _row.get(4).unwrap(),
+            system_order: _row.get(5).unwrap(),
+            id: _row.get(6).unwrap(),
         };
-        zone_list.push( zone);
+        zoneList.push(zone);
     }
-    return zone_list;
+    let list = ZoneList {
+        zones: zoneList
+    };
+    return list;
 }

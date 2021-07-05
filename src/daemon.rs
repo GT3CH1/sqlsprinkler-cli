@@ -1,7 +1,7 @@
 use crate::{get_pool, get_system_status, set_system, zone, turn_off_all_pins, get_pin_state};
 use warp::{Filter, http, reject};
 use serde::{Serialize, Deserialize};
-use std::borrow::Borrow;
+use crate::zone::update_zone;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct SysStatus {
@@ -154,9 +154,9 @@ async fn set_sys_status(_status: SysStatus) -> Result<impl warp::Reply, warp::Re
 
 /// Gets the status of all the zones.
 async fn get_zone_status() -> Result<impl warp::Reply, warp::Rejection> {
-    let zone_list = zone::get_zones();
+    let zone_list = zone::get_zones().clone();
     let mut zone_status_list: Vec<zone::ZoneWithState> = Vec::new();
-    for zone in zone_list {
+    for zone in zone_list.zones.iter() {
         let _zone = zone::Zone::from(zone);
         let zone_with_status = zone::ZoneWithState {
             name: _zone.name,
@@ -176,14 +176,9 @@ async fn get_zone_status() -> Result<impl warp::Reply, warp::Rejection> {
 /// Sets the id of the zone to the given state -> IE, turning on a zone.
 async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, warp::Rejection> {
     let id = _zone.id;
-    let state = _zone.state;
-    let zone_list = zone::get_zones();
-    let zone_from_list = zone_list.as_slice();
-    let zone_to_toggle = zone_from_list[id as usize].borrow();
-    let zone_final = zone_to_toggle;
     turn_off_all_pins();
-    zone::run_zone(zone_final, zone_final.auto_off);
-    Ok(warp::reply::with_status(format!("Setting {}", state), http::StatusCode::OK))
+    zone::run_zone_pin(id);
+    Ok(warp::reply::with_status(format!("Ok"), http::StatusCode::OK))
 }
 
 /// Adds a new zone to the system
@@ -212,24 +207,22 @@ async fn _update_zone(_zone: zone::Zone) -> Result<impl warp::Reply, warp::Rejec
 
 async fn _update_order(_order: zone::ZoneOrder) -> Result<impl warp::Reply, warp::Rejection> {
     let zone_list = zone::get_zones();
+    let _zoneList = zone_list.clone();
     let mut counter = 0;
-    if zone_list.len() == _order.order.len() {
-        for i in _order.order.iter() {
-            let index = counter as usize;
-            let curr_zone = zone_list.as_slice()[index];
-            let _curr_zone = zone::Zone::from(curr_zone);
-            let zone_updated_order = zone::Zone {
-                name: _curr_zone.name,
-                gpio: curr_zone.gpio,
-                time: curr_zone.time,
-                enabled: curr_zone.enabled,
-                auto_off: curr_zone.auto_off,
-                system_order: *i,
-                id: curr_zone.id,
+    if _zoneList.zones.len() == _order.order.len() {
+        for zone in _zoneList.zones.iter() {
+            let _zone = zone::Zone::from(zone);
+            let new_zone = zone::Zone {
+                name: _zone.name,
+                gpio: zone.gpio,
+                time: zone.time,
+                enabled: zone.enabled,
+                auto_off: zone.auto_off,
+                system_order: _order.order.as_slice()[counter],
+                id: zone.id,
             };
-            println!("{}", i);
             counter = counter + 1;
-            zone::update_zone(zone_updated_order);
+            update_zone(new_zone);
         }
         Ok(warp::reply::with_status("ok", http::StatusCode::OK))
     } else {
