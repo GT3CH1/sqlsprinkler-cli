@@ -90,7 +90,12 @@ fn main() {
                         set_system(pool, false);
                     }
                     SysOpts::Run => {
-                        println!("Running the system schedule.")
+                        if get_system_status(get_pool()) {
+                            println!("Running the system schedule.")
+                            //TODO: Start system thread.
+                        } else {
+                            println!("System is not enabled, refusing.");
+                        }
                     }
                     SysOpts::Winterize => {
                         println!("Winterizing the system.");
