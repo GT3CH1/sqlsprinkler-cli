@@ -45,6 +45,7 @@ struct ZoneOpts {
 enum ZoneOptsArgs {
     On,
     Off,
+    Status,
 }
 
 impl FromStr for ZoneOptsArgs {
@@ -53,6 +54,7 @@ impl FromStr for ZoneOptsArgs {
         match input {
             "on" => Ok(ZoneOptsArgs::On),
             "off" => Ok(ZoneOptsArgs::Off),
+            "status" => Ok(ZoneOptsArgs::Status),
             _ => Err(()),
         }
     }
@@ -85,7 +87,6 @@ fn main() {
         match subcommand {
             // Parses the zone sub command, make sure that id is greater than 0.
             Cli::Zone(zone_state) => {
-                let mut zone_toggle: bool = false;
                 if zone_state.id < 0 { panic!("ID must be greater or equal to 0"); }
                 let id = usize::from(zone_state.id);
                 let _zoneList = zoneList;
@@ -96,6 +97,19 @@ fn main() {
                     }
                     ZoneOptsArgs::Off => {
                         zone::set_pin_zone(my_zone, false);
+                    }
+                    ZoneOptsArgs::Status => {
+                        let status: bool = get_pin_state(my_zone.gpio as u8);
+                        let mut state = "".to_string();
+                        if status {
+                            state = "on".to_string();
+                        } else {
+                            state = "off".to_string();
+                        }
+                        println!("Zone {} is currently {}.", my_zone.name, state);
+                    }
+                    _ => {
+                        println!("Not a valid command.");
                     }
                 }
             }
@@ -233,12 +247,13 @@ fn get_pin_state(pin: u8) -> bool {
 fn run_system() {
     let zone_list = zone::get_zones();
     println!("Running system");
-    for zone in &zone_list.zones {
+    for zone in zone_list.zones {
         if zone.enabled {
-            println!("Running zone {}",zone.name);
+            println!("Running zone {}", zone.name);
             set_pin(zone.gpio as u8, true);
-            let run_time = time::Duration::from_secs((zone.time * 60) as u64);
-            thread::sleep(run_time);
+            let run_time = chrono::Duration::minutes(zone.time as i64);
+            let sleep_time = time::Duration::from_secs(run_time.num_seconds() as u64);
+            thread::sleep(sleep_time);
             set_pin(zone.gpio as u8, false);
         }
     }

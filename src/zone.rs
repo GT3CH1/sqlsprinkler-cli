@@ -105,14 +105,14 @@ pub fn run_zone(zone: Zone, auto_off: bool) {
         println!("Zone is not enabled!");
         return;
     }
-    let run_time = time::Duration::from_secs((_zone.time * 60) as u64);
-    println!("{} -> {}", _zone.auto_off, run_time.as_secs());
+    let run_time = chrono::Duration::minutes(zone.time as i64);
+    let sleep_time = time::Duration::from_secs(run_time.num_seconds() as u64);
     set_pin_zone(_zone, true);
     if auto_off {
         thread::spawn(move || {
             let thread_zone = zone.clone();
-            println!("test -> {}",run_time.as_secs());
-            sleep(run_time);
+            println!("test -> {}",run_time.num_minutes());
+            sleep(sleep_time);
             set_pin_zone(thread_zone, false);
         });
         println!("Hello world!");

@@ -12,6 +12,8 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 
 * `sqlsprinkler-cli`
     - Prints out help & version information
+* `sqlsprinkler-cli --daemon`
+    - Starts the SQLSprinkler daemon
 * `sqlsprinkler-cli zone <id> <on,off,status>`
     - Turn the given zone on or off
 * `sqlsprinkler-cli sys <on,off,winterize,run,status>`
@@ -19,12 +21,14 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 
 ## TODO
 
-* [ ] Implement `sqlsprinkler-cli`
-* [x] Implement `sqlsprinkler-cli zone <id> <on,off,status>`
-* [ ] Implement `sqlsprinkler-cli sys run`
 * [ ] Implement `sqlsprinkler-cli sys winterize`
-* [x] Implement `sqlsprinkler-cli sys <on,off>`
-* [x] Implement SQLSprinkler web api
+
+## Features added
+* [x] `sqlsprinkler-cli sys run`
+* [x] `sqlsprinkler-cli zone <id> <on,off,status>`
+* [x] `sqlsprinkler-cli sys <on,off>`
+* [x] `sqlsprinkler-cli sys <on,off>`
+* [x] SQLSprinkler web api
     * [x] Get system schedule status → `GET /system/status`
     * [x] Update system schedule status → `PUT /system/status ` → `{"system_status": status}`
     * [x] Get zone status → `GET /zone/info`
@@ -46,6 +50,7 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
     * [x] Delete zone → ` DELETE /zone` → `{
       "id": 1 }`
     * [x] Change zone ordering → `PUT /zone/order` → `{"order":[0,0,0]}`
+
 
 ## Dependencies
 
