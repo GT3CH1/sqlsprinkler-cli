@@ -1,4 +1,4 @@
-use crate::{get_pool, get_system_status, set_system, get_zones, zone, add_new_zone, delete_zone, update_zone, set_pin_zone, turn_off_all_pins, get_pin_state};
+use crate::{get_pool, get_system_status, set_system, zone, turn_off_all_pins, get_pin_state};
 use warp::{Filter, http, reject};
 use serde::{Serialize, Deserialize};
 use std::borrow::Borrow;
@@ -23,7 +23,6 @@ impl reject::Reject for LengthMismatch {}
 
 #[tokio::main]
 pub(crate) async fn run() {
-    let sys_stat_filter_obj = SysStatus::new();
 
     // Handle get requests to /system/state -> Used to get the current state of the sys schedule
     let get_sys_status = warp::get()
@@ -139,7 +138,7 @@ fn order_json() -> impl Filter<Extract=(zone::ZoneOrder, ), Error=warp::Rejectio
 ///     * `json` A json object representing the current state of the system schedule.
 async fn get_sys_status() -> Result<impl warp::Reply, warp::Rejection> {
     let value = SysStatus {
-        system_enabled: get_system_status(get_pool())
+        system_enabled: get_system_status()
     };
     Ok(warp::reply::json(&value))
 }
@@ -148,28 +147,28 @@ async fn get_sys_status() -> Result<impl warp::Reply, warp::Rejection> {
 /// # Params
 ///     * `_status` The SysStatus object containing the value we are going to set the system status to.
 async fn set_sys_status(_status: SysStatus) -> Result<impl warp::Reply, warp::Rejection> {
-    set_system(get_pool(), _status.system_enabled);
+    set_system(_status.system_enabled);
     println!("{}", _status.system_enabled);
     Ok(warp::reply::with_status("Success", http::StatusCode::OK))
 }
 
 /// Gets the status of all the zones.
 async fn get_zone_status() -> Result<impl warp::Reply, warp::Rejection> {
-    let zone_list: Vec<zone::Zone> = get_zones(get_pool());
+    let zone_list = zone::get_zones();
     let mut zone_status_list: Vec<zone::ZoneWithState> = Vec::new();
-    for zone in zone_list.iter() {
+    for zone in zone_list {
         let _zone = zone::Zone::from(zone);
-        let _zone_with_status = zone::ZoneWithState{
+        let zone_with_status = zone::ZoneWithState {
             name: _zone.name,
-            gpio: _zone.gpio,
-            time: _zone.time,
-            enabled: _zone.enabled,
-            auto_off: _zone.auto_off,
-            system_order: _zone.system_order,
-            state: get_pin_state(_zone.gpio as u8),
-            id: _zone.id
+            gpio: zone.gpio,
+            time: zone.time,
+            enabled: zone.enabled,
+            auto_off: zone.auto_off,
+            system_order: zone.system_order,
+            state: get_pin_state(zone.gpio as u8),
+            id: zone.id,
         };
-        zone_status_list.push(_zone_with_status);
+        zone_status_list.push(zone_with_status);
     }
     Ok(warp::reply::json(&zone_status_list))
 }
@@ -178,9 +177,12 @@ async fn get_zone_status() -> Result<impl warp::Reply, warp::Rejection> {
 async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, warp::Rejection> {
     let id = _zone.id;
     let state = _zone.state;
-    let zone_to_toggle = zone::Zone::from(get_zones(get_pool()).get(id as usize).unwrap());
+    let zone_list = zone::get_zones();
+    let zone_from_list = zone_list.as_slice();
+    let zone_to_toggle = zone_from_list[id as usize].borrow();
+    let zone_final = zone_to_toggle;
     turn_off_all_pins();
-    set_pin_zone(zone_to_toggle, state);
+    zone::run_zone(zone_final, zone_final.auto_off);
     Ok(warp::reply::with_status(format!("Setting {}", state), http::StatusCode::OK))
 }
 
@@ -188,7 +190,7 @@ async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, wa
 /// # Params
 ///     * `_zone` The new zone we are wanting to add to the system.
 async fn _add_zone(_zone: zone::ZoneAdd) -> Result<impl warp::Reply, warp::Rejection> {
-    add_new_zone(_zone);
+    zone::add_new_zone(_zone);
     Ok(warp::reply::with_status("Adding zone", http::StatusCode::CREATED))
 }
 
@@ -196,7 +198,7 @@ async fn _add_zone(_zone: zone::ZoneAdd) -> Result<impl warp::Reply, warp::Rejec
 /// # Params
 ///     * `_zone` The zone we are wanting to delete.
 async fn _delete_zone(_zone: zone::ZoneDelete) -> Result<impl warp::Reply, warp::Rejection> {
-    delete_zone(_zone);
+    zone::delete_zone(_zone);
     Ok(warp::reply::with_status("Deleted zone", http::StatusCode::OK))
 }
 
@@ -204,19 +206,20 @@ async fn _delete_zone(_zone: zone::ZoneDelete) -> Result<impl warp::Reply, warp:
 /// # Params
 ///     * `_zone` The zone we want to update.
 async fn _update_zone(_zone: zone::Zone) -> Result<impl warp::Reply, warp::Rejection> {
-    update_zone(_zone);
+    zone::update_zone(_zone);
     Ok(warp::reply::with_status("Updated zone", http::StatusCode::OK))
 }
 
 async fn _update_order(_order: zone::ZoneOrder) -> Result<impl warp::Reply, warp::Rejection> {
-    let zone_list = get_zones(get_pool());
+    let zone_list = zone::get_zones();
     let mut counter = 0;
     if zone_list.len() == _order.order.len() {
         for i in _order.order.iter() {
             let index = counter as usize;
-            let curr_zone = zone::Zone::from(zone_list.get(index).as_deref().unwrap());
+            let curr_zone = zone_list.as_slice()[index];
+            let _curr_zone = zone::Zone::from(curr_zone);
             let zone_updated_order = zone::Zone {
-                name: curr_zone.name,
+                name: _curr_zone.name,
                 gpio: curr_zone.gpio,
                 time: curr_zone.time,
                 enabled: curr_zone.enabled,
@@ -224,11 +227,11 @@ async fn _update_order(_order: zone::ZoneOrder) -> Result<impl warp::Reply, warp
                 system_order: *i,
                 id: curr_zone.id,
             };
-            println!("{}",i);
+            println!("{}", i);
             counter = counter + 1;
-            update_zone(zone_updated_order);
+            zone::update_zone(zone_updated_order);
         }
-        Ok(warp::reply::json(&_order))
+        Ok(warp::reply::with_status("ok", http::StatusCode::OK))
     } else {
         Err(warp::reject::custom(LengthMismatch))
     }

@@ -8,8 +8,7 @@ use std::borrow::Borrow;
 use mysql::Pool;
 use rppal::gpio::Gpio;
 use rppal::system::DeviceInfo;
-use std::env;
-use std::error::Error;
+use std::{error::Error, env, thread, time};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "example", about = "how to use struct-opt crate")]
@@ -73,26 +72,26 @@ fn main() {
 
                 zone_toggle = zone_state.state == "on";
                 if zone_state.id < 0 { panic!("ID must be greater or equal to 0"); }
-                let zone_id = usize::from(zone_state.id) ;
-                let zones = get_zones(pool);
+                let zone_id = usize::from(zone_state.id);
+                let zones = zone::get_zones();
                 let my_zone = zones[zone_id].borrow();
-                println!("Turning zone {} {:?}", zone_id, my_zone);
-                set_pin(my_zone.gpio as u8, zone_toggle);
+                zone::run_zone(my_zone, my_zone.auto_off);
             }
             // Parses the zone sub command
             Cli::Sys(sys_opts) => {
                 match sys_opts {
                     SysOpts::On => {
-                        set_system(pool, true);
+                        println!("Enable system schedule");
+                        set_system(true);
                     }
                     SysOpts::Off => {
                         println!("Disabling system schedule.");
-                        set_system(pool, false);
+                        set_system(false);
                     }
                     SysOpts::Run => {
-                        if get_system_status(get_pool()) {
-                            println!("Running the system schedule.")
-                            //TODO: Start system thread.
+                        if get_system_status() {
+                            println!("Running the system schedule.");
+                            run_system();
                         } else {
                             println!("System is not enabled, refusing.");
                         }
@@ -101,7 +100,7 @@ fn main() {
                         println!("Winterizing the system.");
                     }
                     SysOpts::Status => {
-                        let system_status = get_system_status(pool);
+                        let system_status = get_system_status();
                         if !json_output {
                             let output = match system_status {
                                 true => "enabled",
@@ -116,6 +115,9 @@ fn main() {
     }
 }
 
+/// Gets a connection to a MySQL database
+/// # Return
+///     `Pool` A connection to the SQL database.
 fn get_pool() -> Pool {
     // Get the SQL database password, parse it.
     let key = "SQL_PASS";
@@ -135,42 +137,18 @@ fn get_pool() -> Pool {
         Err(e) => println!("{}", e),
     }
     // Build the url for the connection
-    let mut url = format!("mysql://{}:{}@{}:3306/SQLSprinkler",user.as_str(),pass.as_str(),host.as_str());
+    let mut url = format!("mysql://{}:{}@{}:3306/SQLSprinkler", user.as_str(), pass.as_str(), host.as_str());
 
     let pool = mysql::Pool::new(url).unwrap();
     return pool;
-}
-
-/// Gets a list of all the zones in this database
-/// # Arguments
-///     * `pool` The SQL connection pool to use to query for zones
-/// # Returns
-///     * `Vec<Zone>` A list of all the zones in the database.
-fn get_zones(pool: Pool) -> Vec<zone::Zone> {
-    let all_zones: Vec<zone::Zone> =
-        pool.prep_exec("SELECT Name, Gpio, Time, Enabled, AutoOff, SystemOrder, ID from Zones ORDER BY SystemOrder", ())
-            .map(|result| {
-                result.map(|x| x.unwrap()).map(|row| {
-                    let (name, gpio, time, enabled, auto_off, system_order, id) = mysql::from_row(row);
-                    zone::Zone {
-                        name,
-                        gpio,
-                        time,
-                        enabled,
-                        auto_off,
-                        system_order,
-                        id,
-                    }
-                }).collect()
-            }).unwrap();
-    return all_zones;
 }
 
 /// Enables or disables the system schedule
 /// # Arguments
 ///     * `pool` The SQL connection pool used to toggle the system.
 ///     * `enabled` If true is passed in, the system is enabled. If false is used, the system is disabled.
-fn set_system(pool: Pool, enabled: bool) {
+fn set_system(enabled: bool) {
+    let pool = get_pool();
     let query = format!("UPDATE Enabled set enabled = {}", enabled);
     pool.prep_exec(query, ()).unwrap();
 }
@@ -180,7 +158,8 @@ fn set_system(pool: Pool, enabled: bool) {
 ///     * `pool` The SQL connection pool used to toggle the system.
 /// # Return
 ///     * `bool` True if the system is enabled, false if not.
-fn get_system_status(pool: Pool) -> bool {
+fn get_system_status() -> bool {
+    let pool = get_pool();
     let query = format!("SELECT enabled FROM Enabled");
     let sys_status: Vec<SysStatus> =
         pool.prep_exec(query, ())
@@ -195,58 +174,11 @@ fn get_system_status(pool: Pool) -> bool {
     return sys_status[0].status;
 }
 
-/// Adds a new zone
-/// # Params
-///     * `_zone` The new zone we want to add.
-fn add_new_zone(_zone: zone::ZoneAdd) {
-    let pool = get_pool();
-    let query = format!("INSERT into `Zones` (`Name`, `Gpio`, `Time`, `AutoOff`, `Enabled`) VALUES \
-     ( '{}','{}','{}',{},{} )", _zone.name, _zone.gpio, _zone.time, _zone.auto_off, _zone.enabled);
-    pool.prep_exec(query, ());
-}
-
-/// Deletes the given zone
-/// # Params
-///     * `_zone` The zone we are deleting
-fn delete_zone(_zone: zone::ZoneDelete) {
-    let pool = get_pool();
-    let query = format!("DELETE FROM `Zones` WHERE id = {}", _zone.id);
-    pool.prep_exec(query, ());
-}
-
-/// Updates a zone with the given id to the values contained in this new zone.
-/// # Params
-///     * `_zone` The zone containing the same id, but new information.
-fn update_zone(_zone: zone::Zone) {
-    let pool = get_pool();
-    let query = format!("UPDATE Zones SET Name='{}', Gpio={}, Time={},AutoOff={},Enabled={},SystemOrder={} WHERE ID={}"
-                        , _zone.name, _zone.gpio, _zone.time, _zone.auto_off, _zone.enabled, _zone.system_order, _zone.id);
-    println!("{}",query);
-    pool.prep_exec(query, ());
-}
-
-/// Updates the system order of the given zone to the given order, and then updates it in the database
-/// # Params
-///     * `order` The number representing the order of the zone
-///     * `zone` The zone we want to change the order of.
-fn change_zone_ordering(order: i8, zone: zone::Zone) {
-   let new_zone_order = zone::Zone {
-       name: zone.name,
-       gpio: zone.gpio,
-       time: zone.time,
-       enabled: zone.enabled,
-       auto_off: zone.auto_off,
-       system_order: order,
-       id: zone.id
-   };
-    update_zone(new_zone_order);
-}
-
 /// Turns the given pin on or off
 /// # Params
 ///     * `pin` The pin we want to control
 ///     * `state` True if we want the pin to turn on, false otherwise.
-fn set_pin(pin: u8, state: bool) -> Result<(), Box<dyn Error>>{
+fn set_pin(pin: u8, state: bool) -> Result<(), Box<dyn Error>> {
     let mut gpio = Gpio::new()?.get(pin).unwrap().into_output();
     if state {
         gpio.set_low();
@@ -256,21 +188,11 @@ fn set_pin(pin: u8, state: bool) -> Result<(), Box<dyn Error>>{
     Ok(())
 }
 
-/// Sets the given zones gpio to the state we want
-/// # Params
-///     * `zone` The zone we want to control
-///     * `state` The state we want the pin to be at - true for on, false for off.
-fn set_pin_zone(zone: zone::Zone, state: bool){
-    // Ensure all the pins are turned off.
-    set_pin(zone.gpio as u8, state);
-}
-
 /// Turns off all the pins in the system
 fn turn_off_all_pins() {
-    let zone_list = get_zones(get_pool());
+    let zone_list = zone::get_zones();
     for zone_in_list in &zone_list {
-        let zone = zone::Zone::from(zone_in_list);
-        set_pin(zone.gpio as u8,false);
+        zone::set_pin_zone(zone_in_list, false);
     }
 }
 
@@ -283,4 +205,20 @@ fn get_pin_state(pin: u8) -> bool {
     let gpio = Gpio::new().unwrap();
     let mut gpio = gpio.get(pin).unwrap().into_output();
     return gpio.is_set_low();
+}
+
+/// Runs the system based on the schedule
+fn run_system() {
+    let zone_list = zone::get_zones();
+    println!("Running system");
+    thread::spawn(move || {
+        for zone in &zone_list {
+            if zone.enabled {
+                zone::set_pin_zone(zone, true);
+                let run_time = time::Duration::from_secs((zone.time * 60) as u64);
+                thread::sleep(run_time);
+                zone::set_pin_zone(zone, false);
+            }
+        }
+    });
 }
