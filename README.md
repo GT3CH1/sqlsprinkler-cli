@@ -1,4 +1,4 @@
-# sqlsprinkler-cli
+# sqlsprinkler-cli 0.1.1
 
 A command line interface for the SQLSprinkler project
 
@@ -12,7 +12,7 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 
 * `sqlsprinkler-cli`
     - Prints out help & version information
-* `sqlsprinkler-cli zone <id> <on,off>`
+* `sqlsprinkler-cli zone <id> <on,off,status>`
     - Turn the given zone on or off
 * `sqlsprinkler-cli sys <on,off,winterize,run,status>`
     - Operate on the system.
@@ -20,16 +20,15 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 ## TODO
 
 * [ ] Implement `sqlsprinkler-cli`
-* [ ] Implement `sqlsprinkler-cli zone <id> <on,off>`
+* [x] Implement `sqlsprinkler-cli zone <id> <on,off,status>`
 * [ ] Implement `sqlsprinkler-cli sys run`
 * [ ] Implement `sqlsprinkler-cli sys winterize`
-* [ ] Implement `sqlsprinkler-cli sys <on,off>`
-* [ ] Implement SQLSprinkler web api
+* [x] Implement `sqlsprinkler-cli sys <on,off>`
+* [x] Implement SQLSprinkler web api
     * [x] Get system schedule status → `GET /system/status`
     * [x] Update system schedule status → `PUT /system/status ` → `{"system_status": status}`
     * [x] Get zone status → `GET /zone/info`
-    * [ ] Toggle zone → `PUT /zone` → `{"id": id, "state": state}`
-        - Currently, partially implemented, no GPIO pins will be toggled as of 07-02-2021
+    * [x] Toggle zone → `PUT /zone` → `{"id": id, "state": state}`
     * [x] Update zone information → `PUT /zone/info` → `{
       "name": "Rust-Zone 123",
       "gpio": 12,
@@ -60,6 +59,6 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 
 ## How-to-use
 
-* Export your SQL password as an environment variable called `SQL_PASS`
-    - ie, `export SQL_PASS='password123'`
-* run your given sqlsprinkler command, and enjoy!
+* Export your SQL password, user, and host as environment variables.
+    - ie, `export SQL_PASS='password123' ; export SQL_HOST='host' ; export SQL_USER='user'`
+* run your wanted sqlsprinkler command, and enjoy!
