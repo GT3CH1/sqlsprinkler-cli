@@ -1,4 +1,4 @@
-use crate::{get_pool, get_system_status, set_system, zone, turn_off_all_pins, get_pin_state};
+use crate::{get_system_status, set_system, zone, turn_off_all_pins, get_pin_state};
 use warp::{Filter, http, reject};
 use serde::{Serialize, Deserialize};
 use crate::zone::update_zone;
@@ -6,14 +6,6 @@ use crate::zone::update_zone;
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct SysStatus {
     system_enabled: bool,
-}
-
-impl SysStatus {
-    fn new() -> Self {
-        SysStatus {
-            system_enabled: true,
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -212,17 +204,8 @@ async fn _update_order(_order: zone::ZoneOrder) -> Result<impl warp::Reply, warp
     if _zoneList.zones.len() == _order.order.len() {
         for zone in _zoneList.zones.iter() {
             let _zone = zone::Zone::from(zone);
-            let new_zone = zone::Zone {
-                name: _zone.name,
-                gpio: zone.gpio,
-                time: zone.time,
-                enabled: zone.enabled,
-                auto_off: zone.auto_off,
-                system_order: _order.order.as_slice()[counter],
-                id: zone.id,
-            };
+            zone::change_zone_ordering(_order.order.as_slice()[counter], _zone);
             counter = counter + 1;
-            update_zone(new_zone);
         }
         Ok(warp::reply::with_status("ok", http::StatusCode::OK))
     } else {

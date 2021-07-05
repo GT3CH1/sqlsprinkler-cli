@@ -8,6 +8,7 @@ use rppal::gpio::Gpio;
 use std::{error::Error, env, thread, time};
 use crate::zone::{Zone};
 use mysql::Pool;
+use std::str::FromStr;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "example", about = "how to use struct-opt crate")]
@@ -36,10 +37,29 @@ enum Cli {
 
 #[derive(StructOpt, Debug)]
 struct ZoneOpts {
-    /// The ID of the zone.
     id: u8,
     state: String,
 }
+
+#[derive(StructOpt, Debug)]
+enum ZoneOptsArgs {
+    On,
+    Off,
+    Run,
+}
+
+impl FromStr for ZoneOptsArgs {
+    type  Err = ();
+    fn from_str(input: &str) -> Result<ZoneOptsArgs, Self::Err> {
+        match input {
+            "on"  => Ok(ZoneOptsArgs::On),
+            "off"  => Ok(ZoneOptsArgs::Off),
+            "run"  => Ok(ZoneOptsArgs::Run),
+            _      => Err(()),
+        }
+    }
+}
+
 
 #[derive(StructOpt, Debug)]
 enum SysOpts {
@@ -68,14 +88,23 @@ fn main() {
             // Parses the zone sub command, make sure that id is greater than 0.
             Cli::Zone(zone_state) => {
                 let mut zone_toggle: bool = false;
-
-                zone_toggle = zone_state.state == "on";
                 if zone_state.id < 0 { panic!("ID must be greater or equal to 0"); }
                 let id = usize::from(zone_state.id);
                 let _zoneList = zoneList;
-                let my_zone: &Zone = zoneList.zones.get(id).unwrap();
-                zone::run_zone(my_zone, my_zone.auto_off);
-
+                let my_zone: Zone = _zoneList.zones.get(id).unwrap().clone();
+                match ZoneOptsArgs::from(zone_state.state.parse().unwrap()) {
+                    ZoneOptsArgs::On => {
+                        zone::set_pin_zone(&my_zone, true);
+                    }
+                    ZoneOptsArgs::Off => {
+                        zone::set_pin_zone(&my_zone, false);
+                    }
+                    ZoneOptsArgs::Run => {
+                        let auto_off = my_zone.auto_off;
+                        let zone = &my_zone;
+                        zone::run_zone(zone.clone(), auto_off);
+                    }
+                }
             }
             // Parses the zone sub command
             Cli::Sys(sys_opts) => {

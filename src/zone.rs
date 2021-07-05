@@ -4,8 +4,6 @@ use std::{thread, time};
 use crate::{set_pin, get_pool};
 use std::borrow::Borrow;
 
-type Zones = Vec<Zone>;
-
 /// Represents a sprinkler system zone
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Zone {
@@ -16,6 +14,20 @@ pub struct Zone {
     pub auto_off: bool,
     pub system_order: i8,
     pub id: i8,
+}
+
+impl Clone for Zone {
+    fn clone(&self) -> Self {
+        Zone {
+            name: self.name.clone(),
+            gpio: self.gpio.clone(),
+            time: self.time.clone(),
+            enabled: self.enabled.clone(),
+            auto_off: self.auto_off.clone(),
+            system_order: self.system_order.clone(),
+            id: self.id.clone()
+        }
+    }
 }
 
 impl From<&Zone> for Zone {
@@ -76,36 +88,27 @@ pub struct ZoneWithState {
     pub state: bool,
     pub id: i8,
 }
-
+#[derive(Clone)]
 pub struct ZoneList {
     pub zones: Vec<Zone>,
-}
-
-impl ZoneList {
-    pub fn new() -> Self {
-        ZoneList { zones: Vec::new() }
-    }
-    pub fn insert(&mut self, zone: Zone) {
-        self.zones.push(zone);
-    }
 }
 
 /// "Runs" the given zone, by turning it on for its specified run-time. USES A NEW THREAD.
 /// # Params
 ///     * `zone` The zone we want to run. Will not run if the `enabled` flag for the zone is false.
 ///     * `auto_off` Whether or not we want to automatically turn off the system -> true for yes, false for no.
-pub fn run_zone(zone: &'static Zone, auto_off: bool) {
+pub fn run_zone(zone: Zone, auto_off: bool) {
     let _zone = zone.clone();
     if !_zone.enabled {
         println!("Zone is not enabled!");
         return;
     }
-    set_pin_zone(_zone, true);
+    set_pin_zone(_zone.borrow(), true);
     if auto_off {
         thread::spawn(move || {
             let run_time = time::Duration::from_secs((_zone.time * 60) as u64);
             thread::sleep(run_time);
-            set_pin_zone(_zone, false);
+            set_pin_zone(_zone.borrow(), false);
         });
     }
 }
@@ -180,7 +183,7 @@ pub fn delete_zone(_zone: ZoneDelete) {
 /// # Params
 ///     * `order` The number representing the order of the zone
 ///     * `zone` The zone we want to change the order of.
-fn change_zone_ordering(order: i8, zone: Zone) {
+pub fn change_zone_ordering(order: i8, zone: Zone) {
     let new_zone_order = Zone {
         name: zone.name,
         gpio: zone.gpio,
@@ -215,7 +218,7 @@ pub(crate) fn get_zones() -> ZoneList {
     let rows = conn
         .query("SELECT Name, Gpio, Time, Enabled, AutoOff, SystemOrder, ID from Zones ORDER BY SystemOrder")
         .unwrap();
-    let mut zoneList: Vec<Zone> = none;
+    let mut zoneList: Vec<Zone> = vec![];
     for row in rows {
         let _row = row.unwrap();
         let zone = Zone {
