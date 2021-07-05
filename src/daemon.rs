@@ -1,7 +1,7 @@
 use crate::{get_system_status, set_system, zone, turn_off_all_pins, get_pin_state};
 use warp::{Filter, http, reject};
 use serde::{Serialize, Deserialize};
-use crate::zone::update_zone;
+use crate::zone::{update_zone, get_zone_from_sys_order};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct SysStatus {
@@ -168,8 +168,14 @@ async fn get_zone_status() -> Result<impl warp::Reply, warp::Rejection> {
 /// Sets the id of the zone to the given state -> IE, turning on a zone.
 async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, warp::Rejection> {
     let id = _zone.id;
-    turn_off_all_pins();
-    zone::run_zone_pin(id);
+    let zone = get_zone_from_sys_order(id);
+    let newState = _zone.state;
+    let zone_auto_off = zone.auto_off;
+    if newState {
+        zone::run_zone(zone,zone_auto_off);
+    } else {
+        zone::set_pin_zone(zone,false);
+    }
     Ok(warp::reply::with_status(format!("Ok"), http::StatusCode::OK))
 }
 

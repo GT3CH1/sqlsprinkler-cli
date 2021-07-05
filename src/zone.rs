@@ -3,6 +3,7 @@ use std::convert::From;
 use std::{thread, time};
 use crate::{set_pin, get_pool};
 use std::borrow::Borrow;
+use std::thread::{Thread, sleep};
 
 /// Represents a sprinkler system zone
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -25,7 +26,7 @@ impl Clone for Zone {
             enabled: self.enabled.clone(),
             auto_off: self.auto_off.clone(),
             system_order: self.system_order.clone(),
-            id: self.id.clone()
+            id: self.id.clone(),
         }
     }
 }
@@ -88,6 +89,7 @@ pub struct ZoneWithState {
     pub state: bool,
     pub id: i8,
 }
+
 #[derive(Clone)]
 pub struct ZoneList {
     pub zones: Vec<Zone>,
@@ -103,15 +105,17 @@ pub fn run_zone(zone: Zone, auto_off: bool) {
         println!("Zone is not enabled!");
         return;
     }
-    set_pin_zone(_zone.borrow(), true);
+    let run_time = time::Duration::from_secs((_zone.time * 60) as u64);
+    println!("{} -> {}", _zone.auto_off, run_time.as_secs());
+    set_pin_zone(_zone, true);
     if auto_off {
         thread::spawn(move || {
-            let run_time = time::Duration::from_secs((_zone.time * 60) as u64);
-            println!("{}",run_time.as_secs());
-
-            thread::sleep(run_time);
-            set_pin_zone(_zone.borrow(), false);
+            let thread_zone = zone.clone();
+            println!("test -> {}",run_time.as_secs());
+            sleep(run_time);
+            set_pin_zone(thread_zone, false);
         });
+        println!("Hello world!");
     }
 }
 
@@ -120,7 +124,6 @@ pub fn run_zone(zone: Zone, auto_off: bool) {
 ///     * `auto_off` Whether or not we want to automatically turn off the system -> true for yes, false for no.
 pub fn run_zone_pin(zone_id: i8) {
     //TODO: I swear this needs to be easier some how but I don't know how
-    let zone_list = get_zones();
     let mut _zone: Zone = Zone {
         name: "".to_string(),
         gpio: 0,
@@ -130,21 +133,18 @@ pub fn run_zone_pin(zone_id: i8) {
         system_order: 0,
         id: 0,
     };
-    for zone in zone_list.zones.iter() {
-        if zone_id == zone.id {
-            _zone = Zone::from(zone);
-        }
-    }
+
     if !_zone.enabled {
         println!("Zone is not enabled!");
         return;
     }
-    set_pin_zone(_zone.borrow(), true);
+    set_pin_zone(_zone.clone(), true);
+    let run_time = time::Duration::from_secs((_zone.time * 60) as u64);
+    println!("{}", run_time.as_secs());
     if _zone.auto_off {
         thread::spawn(move || {
-            let run_time = time::Duration::from_secs((_zone.time * 60) as u64);
             thread::sleep(run_time);
-            set_pin_zone(_zone.borrow(), false);
+            set_pin_zone(_zone.clone(), false);
         });
     }
 }
@@ -154,7 +154,7 @@ pub fn run_zone_pin(zone_id: i8) {
 /// # Params
 ///     * `zone` The zone we want to control
 ///     * `state` The state we want the pin to be at - true for on, false for off.
-pub fn set_pin_zone(zone: &Zone, state: bool) {
+pub fn set_pin_zone(zone: Zone, state: bool) {
     // Ensure all the pins are turned off.
     set_pin(zone.gpio as u8, state);
 }
@@ -238,4 +238,28 @@ pub(crate) fn get_zones() -> ZoneList {
         zones: zoneList
     };
     return list;
+}
+
+/// Gets a specific zone from the given system order
+/// # Params
+///     *   `order` The index of the zone based on system order
+/// # Return
+///     The zone that corresponds to that order
+pub fn get_zone_from_sys_order(order: i8) -> Zone {
+    let zone_list = get_zones();
+    let mut my_zone: Zone = Zone {
+        name: "".to_string(),
+        gpio: 0,
+        time: 0,
+        enabled: false,
+        auto_off: false,
+        system_order: 0,
+        id: 0
+    };
+    for zone in zone_list.zones.iter() {
+        if order == zone.system_order {
+            my_zone= Zone::from(zone);
+        }
+    }
+    return my_zone;
 }
