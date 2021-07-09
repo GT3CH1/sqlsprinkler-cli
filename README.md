@@ -6,6 +6,16 @@ A command line interface for the SQLSprinkler project
 
 - Gavin Pease
 
+## Building
+* Dependencies
+    - [cross](https://github.com/rust-embedded/cross)
+    - Docker
+
+After installing dependencies run `make build-rpi` to build the program.
+
+## Installing
+To install, please run `# make install`
+
 ## Usage
 
 sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified program.
