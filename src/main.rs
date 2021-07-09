@@ -10,7 +10,7 @@ use mysql::Pool;
 use std::str::FromStr;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "example", about = "how to use struct-opt crate")]
+#[structopt(name = "sqlsprinkler", about = "SQLSprinkler")]
 pub struct Opts {
     #[structopt(short = "v", parse(from_occurrences))]
     verbosity: u8,
@@ -18,10 +18,6 @@ pub struct Opts {
     /// Launches the SQLSprinkler API web daemon.
     #[structopt(short = "w", long = "daemon", about = "Launches the SQLSprinkler API web daemon")]
     daemon_mode: bool,
-
-    /// Output everything in JSON.
-    #[structopt(long = "json")]
-    json_output: bool,
 
     // SUBCOMMANDS
     #[structopt(subcommand)]
