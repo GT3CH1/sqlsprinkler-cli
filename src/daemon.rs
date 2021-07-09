@@ -1,7 +1,7 @@
-use crate::{get_system_status, set_system, zone, turn_off_all_pins, get_pin_state};
+use crate::{get_system_status, set_system, zone};
 use warp::{Filter, http, reject};
 use serde::{Serialize, Deserialize};
-use crate::zone::{update_zone, get_zone_from_sys_order};
+use crate::zone::{get_zone_from_id};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct SysStatus {
@@ -150,16 +150,7 @@ async fn get_zone_status() -> Result<impl warp::Reply, warp::Rejection> {
     let mut zone_status_list: Vec<zone::ZoneWithState> = Vec::new();
     for zone in zone_list.zones.iter() {
         let _zone = zone::Zone::from(zone);
-        let zone_with_status = zone::ZoneWithState {
-            name: _zone.name,
-            gpio: zone.gpio,
-            time: zone.time,
-            enabled: zone.enabled,
-            auto_off: zone.auto_off,
-            system_order: zone.system_order,
-            state: get_pin_state(zone.gpio as u8),
-            id: zone.id,
-        };
+        let zone_with_status = _zone.get_zone_with_state();
         zone_status_list.push(zone_with_status);
     }
     Ok(warp::reply::json(&zone_status_list))
@@ -167,16 +158,20 @@ async fn get_zone_status() -> Result<impl warp::Reply, warp::Rejection> {
 
 /// Sets the id of the zone to the given state -> IE, turning on a zone.
 async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, warp::Rejection> {
-    let id = _zone.id;
-    let zone = get_zone_from_sys_order(id);
-    let newState = _zone.state;
-    let zone_auto_off = zone.auto_off;
-    if newState {
-        zone::run_zone(zone,zone_auto_off);
+    let state = _zone.state;
+    let zone = get_zone_from_id(_zone.id);
+    if state {
+        /*
+        NOTE:
+         Here we want to run the zone instead of just turning it on. This is because we are running
+         inside the daemon, and we can use the "auto-off" feature to automatically turn off the zone
+         if unattended.
+         */
+        zone.run_zone();
     } else {
-        zone::set_pin_zone(zone,false);
+        zone.turn_off();
     }
-    Ok(warp::reply::with_status(format!("Ok"), http::StatusCode::OK))
+    Ok(warp::reply::with_status("Ok", http::StatusCode::OK))
 }
 
 /// Adds a new zone to the system
@@ -199,7 +194,8 @@ async fn _delete_zone(_zone: zone::ZoneDelete) -> Result<impl warp::Reply, warp:
 /// # Params
 ///     * `_zone` The zone we want to update.
 async fn _update_zone(_zone: zone::Zone) -> Result<impl warp::Reply, warp::Rejection> {
-    zone::update_zone(_zone);
+    let zone = zone::get_zone_from_id(_zone.id);
+    zone.update_zone(_zone);
     Ok(warp::reply::with_status("Updated zone", http::StatusCode::OK))
 }
 
@@ -210,7 +206,8 @@ async fn _update_order(_order: zone::ZoneOrder) -> Result<impl warp::Reply, warp
     if _zoneList.zones.len() == _order.order.len() {
         for zone in _zoneList.zones.iter() {
             let _zone = zone::Zone::from(zone);
-            zone::change_zone_ordering(_order.order.as_slice()[counter], _zone);
+            let new_order = _order.order.as_slice()[counter];
+            _zone.set_order(new_order);
             counter = counter + 1;
         }
         Ok(warp::reply::with_status("ok", http::StatusCode::OK))

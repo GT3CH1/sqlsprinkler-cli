@@ -1,9 +1,9 @@
 use serde::{Serialize, Deserialize};
 use std::convert::From;
 use std::{thread, time};
-use crate::{set_pin, get_pool};
-use std::borrow::Borrow;
-use std::thread::{Thread, sleep};
+use crate::{get_pool};
+use rppal::gpio::{Gpio, OutputPin};
+use std::error::Error;
 
 /// Represents a sprinkler system zone
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -15,6 +15,98 @@ pub struct Zone {
     pub auto_off: bool,
     pub system_order: i8,
     pub id: i8,
+}
+
+impl Zone {
+    /// Gets the pin of this zone
+    /// # Return
+    ///     `pin` A u8 representing the gpio pin.
+    fn get_pin(&self) -> u8 {
+        return self.gpio as u8;
+    }
+
+    /// Gets the gpio interface for this zone.
+    /// # Return
+    ///     `gpio` An OutputPin that we can use to turn the zone on or off
+    pub(self) fn get_gpio(&self) -> OutputPin {
+        let pin = self.get_pin();
+        let pin = match Gpio::new() {
+            Ok(gpio) => gpio.get(pin),
+            Err(gpio) => Err((gpio)),
+        };
+        pin.unwrap().into_output()
+    }
+
+    /// Turns on this zone.
+    pub fn turn_on(&self) {
+        self.get_gpio().set_low();
+    }
+
+    /// Turns off this zone.
+    pub fn turn_off(&self) {}
+
+    /// Gets the name of this zone
+    pub fn get_name(&self) -> String {
+        return self.clone().name;
+    }
+
+    /// Runs this zone, and automatically turn it off if launched from another thread and if
+    /// `auto_off` is set to true for this zone. Will run for `time` minutes
+    pub fn run_zone(&self) {
+        self.turn_on();
+        if self.auto_off {
+            let _zone = self.clone();
+            thread::spawn(move || {
+                let run_time = time::Duration::from_secs((_zone.time * 60) as u64);
+                thread::sleep(run_time);
+                _zone.turn_off()
+            });
+        }
+    }
+
+    /// Updates this zone to the given `zone` parameter.
+    /// # Params
+    ///     * `zone` A zone struct representing the new values for this zone.
+    pub fn update_zone(&self, zone: Zone) {
+        let pool = get_pool();
+        let query = format!("UPDATE Zones SET Name='{}', Gpio={}, Time={},AutoOff={},Enabled={},SystemOrder={} WHERE ID={}"
+                            , zone.name, zone.gpio, zone.time, zone.auto_off, zone.enabled, zone.system_order, zone.id);
+        println!("{}", query);
+        pool.prep_exec(query, ());
+    }
+
+    /// Gets whether or not this zone is on
+    /// # Return
+    ///     `on` A bool representing whether or not this zone is on.
+    pub fn is_on(&self) -> bool {
+        return self.get_gpio().is_set_low();
+    }
+
+    /// Gets a representation of this zone, but also with `is_on` as bool `state`
+    /// # Return
+    /// `zone_with_state` A ZoneWithState struct representing this zone and its current state.
+    pub fn get_zone_with_state(&self) -> ZoneWithState {
+        let new_zone = ZoneWithState {
+            name: self.get_name(),
+            gpio: self.gpio,
+            time: self.time,
+            enabled: self.enabled,
+            auto_off: self.auto_off,
+            system_order: self.system_order,
+            state: self.is_on(),
+            id: self.id,
+        };
+        return new_zone;
+    }
+
+    /// Updates the order of this zone
+    /// # Params
+    ///     `order` An i8 representing the new ordering of this zone.
+    pub fn set_order(&self, order: i8) {
+        let mut updated_zone = self.clone();
+        updated_zone.system_order = order;
+        self.update_zone(updated_zone);
+    }
 }
 
 impl Clone for Zone {
@@ -95,35 +187,13 @@ pub struct ZoneList {
     pub zones: Vec<Zone>,
 }
 
-/// "Runs" the given zone, by turning it on for its specified run-time. USES A NEW THREAD.
+/// Gets a zone from the given id
 /// # Params
-///     * `zone` The zone we want to run. Will not run if the `enabled` flag for the zone is false.
-///     * `auto_off` Whether or not we want to automatically turn off the system -> true for yes, false for no.
-pub fn run_zone(zone: Zone, auto_off: bool) {
-    let _zone = zone.clone();
-    if !_zone.enabled {
-        println!("Zone is not enabled!");
-        return;
-    }
-    let run_time = chrono::Duration::minutes(zone.time as i64);
-    let sleep_time = time::Duration::from_secs(run_time.num_seconds() as u64);
-    set_pin_zone(_zone, true);
-    if auto_off {
-        thread::spawn(move || {
-            let thread_zone = zone.clone();
-            println!("test -> {}",run_time.num_minutes());
-            sleep(sleep_time);
-            set_pin_zone(thread_zone, false);
-        });
-        println!("Hello world!");
-    }
-}
-
-/// # Params
-///     * `pin` the GPIO pin we want to turn on.
-///     * `auto_off` Whether or not we want to automatically turn off the system -> true for yes, false for no.
-pub fn run_zone_pin(zone_id: i8) {
-    //TODO: I swear this needs to be easier some how but I don't know how
+///     * `zone_id` The id of the zone we want to get
+/// # Return
+///     * `Zone` The zone that corresponds to the given id.
+pub fn get_zone_from_id(zone_id: i8) -> Zone {
+    let zone_list = get_zones();
     let mut _zone: Zone = Zone {
         name: "".to_string(),
         gpio: 0,
@@ -133,42 +203,13 @@ pub fn run_zone_pin(zone_id: i8) {
         system_order: 0,
         id: 0,
     };
-
-    if !_zone.enabled {
-        println!("Zone is not enabled!");
-        return;
+    for zone in zone_list.zones.iter() {
+        if zone_id == zone.id {
+            _zone = Zone::from(zone);
+            break;
+        }
     }
-    set_pin_zone(_zone.clone(), true);
-    let run_time = time::Duration::from_secs((_zone.time * 60) as u64);
-    println!("{}", run_time.as_secs());
-    if _zone.auto_off {
-        thread::spawn(move || {
-            thread::sleep(run_time);
-            set_pin_zone(_zone.clone(), false);
-        });
-    }
-}
-
-
-/// Sets the given zones gpio to the state we want
-/// # Params
-///     * `zone` The zone we want to control
-///     * `state` The state we want the pin to be at - true for on, false for off.
-pub fn set_pin_zone(zone: Zone, state: bool) {
-    // Ensure all the pins are turned off.
-    set_pin(zone.gpio as u8, state);
-}
-
-/// Updates a zone with the given id to the values contained in this new zone.
-/// # Params
-///     * `zone` The zone containing the same id, but new information.
-///     * `pool` The MySQL connection pool to use.
-pub fn update_zone(zone: Zone) {
-    let pool = get_pool();
-    let query = format!("UPDATE Zones SET Name='{}', Gpio={}, Time={},AutoOff={},Enabled={},SystemOrder={} WHERE ID={}"
-                        , zone.name, zone.gpio, zone.time, zone.auto_off, zone.enabled, zone.system_order, zone.id);
-    println!("{}", query);
-    pool.prep_exec(query, ());
+    return _zone;
 }
 
 /// Deletes the given zone
@@ -178,24 +219,6 @@ pub fn delete_zone(_zone: ZoneDelete) {
     let pool = get_pool();
     let query = format!("DELETE FROM `Zones` WHERE id = {}", _zone.id);
     pool.prep_exec(query, ());
-}
-
-
-/// Updates the system order of the given zone to the given order, and then updates it in the database
-/// # Params
-///     * `order` The number representing the order of the zone
-///     * `zone` The zone we want to change the order of.
-pub fn change_zone_ordering(order: i8, zone: Zone) {
-    let new_zone_order = Zone {
-        name: zone.name,
-        gpio: zone.gpio,
-        time: zone.time,
-        enabled: zone.enabled,
-        auto_off: zone.auto_off,
-        system_order: order,
-        id: zone.id,
-    };
-    update_zone(new_zone_order);
 }
 
 /// Adds a new zone
@@ -238,28 +261,4 @@ pub(crate) fn get_zones() -> ZoneList {
         zones: zoneList
     };
     return list;
-}
-
-/// Gets a specific zone from the given system order
-/// # Params
-///     *   `order` The index of the zone based on system order
-/// # Return
-///     The zone that corresponds to that order
-pub fn get_zone_from_sys_order(order: i8) -> Zone {
-    let zone_list = get_zones();
-    let mut my_zone: Zone = Zone {
-        name: "".to_string(),
-        gpio: 0,
-        time: 0,
-        enabled: false,
-        auto_off: false,
-        system_order: 0,
-        id: 0
-    };
-    for zone in zone_list.zones.iter() {
-        if order == zone.system_order {
-            my_zone= Zone::from(zone);
-        }
-    }
-    return my_zone;
 }

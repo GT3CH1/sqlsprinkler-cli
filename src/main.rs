@@ -5,7 +5,7 @@ mod zone;
 
 use structopt::StructOpt;
 use rppal::gpio::Gpio;
-use std::{error::Error, env, thread, time};
+use std::{error::Error, env, thread};
 use crate::zone::{Zone};
 use mysql::Pool;
 use std::str::FromStr;
@@ -93,20 +93,14 @@ fn main() {
                 let my_zone: Zone = _zoneList.zones.get(id).unwrap().clone();
                 match ZoneOptsArgs::from(zone_state.state.parse().unwrap()) {
                     ZoneOptsArgs::On => {
-                        zone::set_pin_zone(my_zone, true);
+                        my_zone.turn_on();
                     }
                     ZoneOptsArgs::Off => {
-                        zone::set_pin_zone(my_zone, false);
+                        my_zone.turn_off();
                     }
                     ZoneOptsArgs::Status => {
-                        let status: bool = get_pin_state(my_zone.gpio as u8);
-                        let mut state = "".to_string();
-                        if status {
-                            state = "on".to_string();
-                        } else {
-                            state = "off".to_string();
-                        }
-                        println!("Zone {} is currently {}.", my_zone.name, state);
+                        let zone = &my_zone;
+                        zone.is_on();
                     }
                     _ => {
                         println!("Not a valid command.");
@@ -223,12 +217,11 @@ fn set_pin(pin: u8, state: bool) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// Turns off all the pins in the system
-fn turn_off_all_pins() {
+/// Turns off all the zones in the system
+fn turn_off_all_zones() {
     let zone_list = zone::get_zones();
     for zone_in_list in &zone_list.zones {
-        let my_zone = zone_in_list;
-        set_pin(my_zone.gpio as u8, false);
+        zone_in_list.turn_off();
     }
 }
 
@@ -247,14 +240,11 @@ fn get_pin_state(pin: u8) -> bool {
 fn run_system() {
     let zone_list = zone::get_zones();
     println!("Running system");
-    for zone in zone_list.zones {
-        if zone.enabled {
-            println!("Running zone {}", zone.name);
-            set_pin(zone.gpio as u8, true);
-            let run_time = chrono::Duration::minutes(zone.time as i64);
-            let sleep_time = time::Duration::from_secs(run_time.num_seconds() as u64);
-            thread::sleep(sleep_time);
-            set_pin(zone.gpio as u8, false);
+    thread::spawn(move || {
+        for zone in &zone_list.zones {
+            if zone.enabled {
+                zone.run_zone();
+            }
         }
-    }
+    });
 }
