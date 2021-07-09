@@ -5,7 +5,7 @@ use crate::{get_pool};
 use rppal::gpio::{Gpio, OutputPin};
 use mysql::Row;
 
-/// Represents a sprinkler system zone
+/// Represents a SQLSprinkler zone.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Zone {
     pub name: String,
@@ -17,11 +17,19 @@ pub struct Zone {
     pub id: i8,
 }
 
+// - turn_on -> Allows user to turn on this zone
+// - turn_off -> Turns off this zone.
+// - get_name -> Gets the name for this zone
+// - run_zone -> Runs the zone based off its configuration.
+// - update_zone -> Updates the zone to a new zone.
+// - is_on -> Whether or not this zone is currently active.
+// - get_zone_with_state -> Returns the zone, but with the `state` parameter as well (ZoneWithState)
+// - set_order -> Sets the system ordering for the zone.
 impl Zone {
     /// Gets the pin of this zone
     /// # Return
     ///     `pin` A u8 representing the gpio pin.
-    fn get_pin(&self) -> u8 {
+    pub(self) fn get_pin(&self) -> u8 {
         self.gpio as u8
     }
 
@@ -117,6 +125,7 @@ impl Zone {
     }
 }
 
+/// Clone this zone.
 impl Clone for Zone {
     fn clone(&self) -> Self {
         Zone {
@@ -131,6 +140,7 @@ impl Clone for Zone {
     }
 }
 
+/// Converts from a borrowed zone to a non-borrowed zone.
 impl From<&Zone> for Zone {
     fn from(item: &Zone) -> Self {
         Zone {
@@ -144,6 +154,8 @@ impl From<&Zone> for Zone {
         }
     }
 }
+
+/// Converts a row from the MySQL database to a Zone struct.
 impl From<Row> for Zone {
     fn from(row: Row) -> Self {
         Zone {
@@ -168,6 +180,9 @@ pub struct ZoneToggle {
     pub state: bool,
 }
 
+/// Object representing the ordering of a zone.
+/// # Params
+///     * `order` A JSON list representing the new system ordering.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ZoneOrder {
     pub order: Vec<i8>,
