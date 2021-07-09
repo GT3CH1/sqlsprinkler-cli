@@ -3,6 +3,7 @@ use std::convert::From;
 use std::{thread, time};
 use crate::{get_pool};
 use rppal::gpio::{Gpio, OutputPin};
+use mysql::Row;
 
 /// Represents a sprinkler system zone
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -143,6 +144,19 @@ impl From<&Zone> for Zone {
         }
     }
 }
+impl From<Row> for Zone {
+    fn from(row: Row) -> Self {
+        Zone {
+            name: row.get(0).unwrap(),
+            gpio: row.get(1).unwrap(),
+            time: row.get(2).unwrap(),
+            enabled: row.get(3).unwrap(),
+            auto_off: row.get(4).unwrap(),
+            system_order: row.get(5).unwrap(),
+            id: row.get(6).unwrap(),
+        }
+    }
+}
 
 /// Object representing toggling the zone.
 /// # Params
@@ -194,6 +208,9 @@ pub struct ZoneList {
     pub zones: Vec<Zone>,
 }
 
+/// Creates an empty zone
+/// # Return
+///     An empty zone.
 pub fn empty_zone() -> Zone {
     let empty_zone = Zone {
         name: "".to_string(),
@@ -220,16 +237,7 @@ pub fn get_zone_from_order(zone_order: i8) -> Zone {
     let mut _zone = empty_zone();
     for row in rows {
         let _row = row.unwrap();
-        let zone = Zone {
-            name: _row.get(0).unwrap(),
-            gpio: _row.get(1).unwrap(),
-            time: _row.get(2).unwrap(),
-            enabled: _row.get(3).unwrap(),
-            auto_off: _row.get(4).unwrap(),
-            system_order: _row.get(5).unwrap(),
-            id: _row.get(6).unwrap(),
-        };
-        _zone = zone;
+        let _zone = Zone::from(_row);
     }
     return _zone;
 }
@@ -276,15 +284,7 @@ pub(crate) fn get_zones() -> ZoneList {
     let mut zone_list: Vec<Zone> = vec![];
     for row in rows {
         let _row = row.unwrap();
-        let zone = Zone {
-            name: _row.get(0).unwrap(),
-            gpio: _row.get(1).unwrap(),
-            time: _row.get(2).unwrap(),
-            enabled: _row.get(3).unwrap(),
-            auto_off: _row.get(4).unwrap(),
-            system_order: _row.get(5).unwrap(),
-            id: _row.get(6).unwrap(),
-        };
+        let zone = Zone::from(_row);
         zone_list.push(zone);
     }
     let list = ZoneList {
