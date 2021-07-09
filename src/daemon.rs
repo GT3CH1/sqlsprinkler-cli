@@ -202,6 +202,9 @@ async fn _update_zone(_zone: zone::Zone) -> Result<impl warp::Reply, warp::Rejec
     Ok(warp::reply::with_status("Updated zone", http::StatusCode::OK))
 }
 
+/// Updates the order of all zones in the system
+/// # Params
+///     * `_order` The new ordering of the system
 async fn _update_order(_order: zone::ZoneOrder) -> Result<impl warp::Reply, warp::Rejection> {
     let zone_list = zone::get_zones();
     let _zone_list = zone_list.clone();
