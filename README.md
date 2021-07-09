@@ -23,7 +23,7 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 * `sqlsprinkler-cli`
     - Prints out help & version information
 * `sqlsprinkler-cli --daemon`
-    - Starts the SQLSprinkler daemon
+    - Starts the SQLSprinkler daemon on port 3030.
 * `sqlsprinkler-cli zone <id> <on,off,status>`
     - Turn the given zone on or off
 * `sqlsprinkler-cli sys <on,off,winterize,run,status>`
@@ -33,11 +33,11 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 * [ ] Implement `sqlsprinkler-cli sys winterize (test?)`
     *   Run each system for 10 seconds, and then sleep for 3 minutess
 * [ ] A and B days
+* [ ] Make `sqlsprinkler zone ...` call the Web API to control turning zones on and off.
 
 ## Features added
 * [x] `sqlsprinkler-cli sys run`
 * [x] `sqlsprinkler-cli zone <id> <on,off,status>`
-* [x] `sqlsprinkler-cli sys <on,off>`
 * [x] `sqlsprinkler-cli sys <on,off>`
 * [x] SQLSprinkler web api
     * [x] Get system schedule status → `GET /system/status`
