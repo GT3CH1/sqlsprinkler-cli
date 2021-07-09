@@ -73,7 +73,6 @@ struct SysStatus {
 fn main() {
     let cli = Opts::from_args();
     let daemon_mode = cli.daemon_mode;
-    let json_output = cli.json_output;
     if daemon_mode {
         daemon::run();
     }
@@ -122,13 +121,11 @@ fn main() {
                     }
                     SysOpts::Status => {
                         let system_status = get_system_status();
-                        if !json_output {
-                            let output = match system_status {
-                                true => "enabled",
-                                false => "disabled",
-                            };
-                            println!("The system is {}", output);
-                        }
+                        let output = match system_status {
+                            true => "enabled",
+                            false => "disabled",
+                        };
+                        println!("The system is {}", output);
                     }
                 }
             }
