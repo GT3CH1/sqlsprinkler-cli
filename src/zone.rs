@@ -194,14 +194,8 @@ pub struct ZoneList {
     pub zones: Vec<Zone>,
 }
 
-/// Gets a zone from the given id
-/// # Params
-///     * `zone_id` The id of the zone we want to get
-/// # Return
-///     * `Zone` The zone that corresponds to the given id.
-pub fn get_zone_from_id(zone_id: i8) -> Zone {
-    let zone_list = get_zones();
-    let mut _zone: Zone = Zone {
+pub fn empty_zone() -> Zone {
+    let empty_zone = Zone {
         name: "".to_string(),
         gpio: 0,
         time: 0,
@@ -210,13 +204,34 @@ pub fn get_zone_from_id(zone_id: i8) -> Zone {
         system_order: 0,
         id: 0,
     };
-    for zone in zone_list.zones.iter() {
-        if zone_id == zone.id {
-            _zone = Zone::from(zone);
-            return _zone;
-        }
+    empty_zone
+}
+
+/// Gets a zone from the given id
+/// # Params
+///     * `zone_id` The id of the zone we want to get
+/// # Return
+///     * `Zone` The zone that corresponds to the given id.
+pub fn get_zone_from_order(zone_order: i8) -> Zone {
+    let pool = get_pool();
+    let mut conn = pool.get_conn().unwrap();
+    let query = format!("SELECT Name, Gpio, Time, Enabled, AutoOff, SystemOrder, ID from Zones WHERE SystemOrder={}", zone_order);
+    let rows = conn.query(query).unwrap();
+    let mut _zone = empty_zone();
+    for row in rows {
+        let _row = row.unwrap();
+        let zone = Zone {
+            name: _row.get(0).unwrap(),
+            gpio: _row.get(1).unwrap(),
+            time: _row.get(2).unwrap(),
+            enabled: _row.get(3).unwrap(),
+            auto_off: _row.get(4).unwrap(),
+            system_order: _row.get(5).unwrap(),
+            id: _row.get(6).unwrap(),
+        };
+        _zone = zone;
     }
-    _zone
+    return _zone;
 }
 
 /// Deletes the given zone
@@ -236,7 +251,7 @@ pub fn delete_zone(_zone: ZoneDelete) -> bool {
 /// # Params
 ///     * `_zone` The new zone we want to add.
 ///     * `pool` The MySQL connection pool to use.
-pub(crate) fn add_new_zone(_zone: ZoneAdd)-> bool {
+pub(crate) fn add_new_zone(_zone: ZoneAdd) -> bool {
     let pool = get_pool();
     let query = format!("INSERT into `Zones` (`Name`, `Gpio`, `Time`, `AutoOff`, `Enabled`) VALUES \
      ( '{}','{}','{}',{},{} )", _zone.name, _zone.gpio, _zone.time, _zone.auto_off, _zone.enabled);
