@@ -14,7 +14,8 @@ A command line interface for the SQLSprinkler project
 After installing dependencies run `make build-rpi` to build the program.
 
 ## Installing
-To install, please run `# make install`
+* To install, please run `# make install`
+* To install the service, please run `#make install-service` (`make install` will also do this).
 
 ## Usage
 
