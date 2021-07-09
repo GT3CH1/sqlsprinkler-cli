@@ -22,7 +22,6 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 ## TODO
 * [ ] Implement `sqlsprinkler-cli sys winterize (test?)`
     *   Run each system for 10 seconds, and then sleep for 3 minutes
-* [ ] Clean `zone.rs`, make a few methods for the `Zone` struct that could actually be of use, such as on and off
 * [ ] Figure out how to better implement getting zones from zone order [see this](https://github.com/GT3CH1/sqlsprinkler-cli/blame/master/src/zone.rs#L248) example
 * [ ] A and B days
 
