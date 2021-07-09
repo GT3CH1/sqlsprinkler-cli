@@ -3,7 +3,6 @@ use std::convert::From;
 use std::{thread, time};
 use crate::{get_pool};
 use rppal::gpio::{Gpio, OutputPin};
-use std::error::Error;
 
 /// Represents a sprinkler system zone
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -22,7 +21,7 @@ impl Zone {
     /// # Return
     ///     `pin` A u8 representing the gpio pin.
     fn get_pin(&self) -> u8 {
-        return self.gpio as u8;
+        self.gpio as u8
     }
 
     /// Gets the gpio interface for this zone.
@@ -32,7 +31,7 @@ impl Zone {
         let pin = self.get_pin();
         let pin = match Gpio::new() {
             Ok(gpio) => gpio.get(pin),
-            Err(gpio) => Err((gpio)),
+            Err(gpio) => Err(gpio),
         };
         pin.unwrap().into_output()
     }
@@ -43,11 +42,13 @@ impl Zone {
     }
 
     /// Turns off this zone.
-    pub fn turn_off(&self) {}
+    pub fn turn_off(&self) {
+        self.get_gpio().set_high();
+    }
 
     /// Gets the name of this zone
     pub fn get_name(&self) -> String {
-        return self.clone().name;
+        self.clone().name
     }
 
     /// Runs this zone, and automatically turn it off if launched from another thread and if
@@ -67,19 +68,25 @@ impl Zone {
     /// Updates this zone to the given `zone` parameter.
     /// # Params
     ///     * `zone` A zone struct representing the new values for this zone.
-    pub fn update_zone(&self, zone: Zone) {
+    /// # Return
+    ///     * `ok` A bool representing whether or not the update was successful
+    pub fn update_zone(&self, zone: Zone) -> bool {
         let pool = get_pool();
         let query = format!("UPDATE Zones SET Name='{}', Gpio={}, Time={},AutoOff={},Enabled={},SystemOrder={} WHERE ID={}"
                             , zone.name, zone.gpio, zone.time, zone.auto_off, zone.enabled, zone.system_order, zone.id);
         println!("{}", query);
-        pool.prep_exec(query, ());
+        let result = match pool.prep_exec(query, ()) {
+            Ok(..) => true,
+            Err(..) => false
+        };
+        result
     }
 
     /// Gets whether or not this zone is on
     /// # Return
     ///     `on` A bool representing whether or not this zone is on.
     pub fn is_on(&self) -> bool {
-        return self.get_gpio().is_set_low();
+        self.get_gpio().is_set_low()
     }
 
     /// Gets a representation of this zone, but also with `is_on` as bool `state`
@@ -96,7 +103,7 @@ impl Zone {
             state: self.is_on(),
             id: self.id,
         };
-        return new_zone;
+        new_zone
     }
 
     /// Updates the order of this zone
@@ -206,30 +213,38 @@ pub fn get_zone_from_id(zone_id: i8) -> Zone {
     for zone in zone_list.zones.iter() {
         if zone_id == zone.id {
             _zone = Zone::from(zone);
-            break;
+            return _zone;
         }
     }
-    return _zone;
+    _zone
 }
 
 /// Deletes the given zone
 /// # Params
 ///     * `_zone` The zone we are deleting
-pub fn delete_zone(_zone: ZoneDelete) {
+pub fn delete_zone(_zone: ZoneDelete) -> bool {
     let pool = get_pool();
     let query = format!("DELETE FROM `Zones` WHERE id = {}", _zone.id);
-    pool.prep_exec(query, ());
+    let result = match pool.prep_exec(query, ()) {
+        Ok(..) => true,
+        Err(..) => false,
+    };
+    result
 }
 
 /// Adds a new zone
 /// # Params
 ///     * `_zone` The new zone we want to add.
 ///     * `pool` The MySQL connection pool to use.
-pub(crate) fn add_new_zone(_zone: ZoneAdd) {
+pub(crate) fn add_new_zone(_zone: ZoneAdd)-> bool {
     let pool = get_pool();
     let query = format!("INSERT into `Zones` (`Name`, `Gpio`, `Time`, `AutoOff`, `Enabled`) VALUES \
      ( '{}','{}','{}',{},{} )", _zone.name, _zone.gpio, _zone.time, _zone.auto_off, _zone.enabled);
-    pool.prep_exec(query, ());
+    let result = match pool.prep_exec(query, ()) {
+        Ok(..) => true,
+        Err(..) => false,
+    };
+    result
 }
 
 /// Gets a list of all the zones in this database
@@ -243,7 +258,7 @@ pub(crate) fn get_zones() -> ZoneList {
     let rows = conn
         .query("SELECT Name, Gpio, Time, Enabled, AutoOff, SystemOrder, ID from Zones ORDER BY SystemOrder")
         .unwrap();
-    let mut zoneList: Vec<Zone> = vec![];
+    let mut zone_list: Vec<Zone> = vec![];
     for row in rows {
         let _row = row.unwrap();
         let zone = Zone {
@@ -255,10 +270,10 @@ pub(crate) fn get_zones() -> ZoneList {
             system_order: _row.get(5).unwrap(),
             id: _row.get(6).unwrap(),
         };
-        zoneList.push(zone);
+        zone_list.push(zone);
     }
     let list = ZoneList {
-        zones: zoneList
+        zones: zone_list
     };
     return list;
 }

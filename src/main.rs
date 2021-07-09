@@ -4,8 +4,7 @@ mod daemon;
 mod zone;
 
 use structopt::StructOpt;
-use rppal::gpio::Gpio;
-use std::{error::Error, env, thread};
+use std::{env, thread};
 use crate::zone::{Zone};
 use mysql::Pool;
 use std::str::FromStr;
@@ -82,15 +81,14 @@ fn main() {
     if daemon_mode {
         daemon::run();
     }
-    let zoneList = zone::get_zones();
+    let zone_list = zone::get_zones();
     if let Some(subcommand) = cli.commands {
         match subcommand {
             // Parses the zone sub command, make sure that id is greater than 0.
             Cli::Zone(zone_state) => {
-                if zone_state.id < 0 { panic!("ID must be greater or equal to 0"); }
                 let id = usize::from(zone_state.id);
-                let _zoneList = zoneList;
-                let my_zone: Zone = _zoneList.zones.get(id).unwrap().clone();
+                let _zone_list = zone_list;
+                let my_zone: Zone = _zone_list.zones.get(id).unwrap().clone();
                 match ZoneOptsArgs::from(zone_state.state.parse().unwrap()) {
                     ZoneOptsArgs::On => {
                         my_zone.turn_on();
@@ -101,9 +99,6 @@ fn main() {
                     ZoneOptsArgs::Status => {
                         let zone = &my_zone;
                         zone.is_on();
-                    }
-                    _ => {
-                        println!("Not a valid command.");
                     }
                 }
             }
@@ -203,37 +198,12 @@ fn get_system_status() -> bool {
     return sys_status[0].status;
 }
 
-/// Turns the given pin on or off
-/// # Params
-///     * `pin` The pin we want to control
-///     * `state` True if we want the pin to turn on, false otherwise.
-fn set_pin(pin: u8, state: bool) -> Result<(), Box<dyn Error>> {
-    let mut gpio = Gpio::new()?.get(pin).unwrap().into_output();
-    if state {
-        gpio.set_low();
-    } else {
-        gpio.set_high();
-    }
-    Ok(())
-}
-
 /// Turns off all the zones in the system
 fn turn_off_all_zones() {
     let zone_list = zone::get_zones();
     for zone_in_list in &zone_list.zones {
         zone_in_list.turn_off();
     }
-}
-
-/// Get the gpio state
-/// # Params
-///      * `zone` The zone we want to get the state of.
-/// # Return
-///     * `bool` Whether or not the pin is set to low.
-fn get_pin_state(pin: u8) -> bool {
-    let gpio = Gpio::new().unwrap();
-    let gpio = gpio.get(pin).unwrap().into_output();
-    return gpio.is_set_low();
 }
 
 /// Runs the system based on the schedule

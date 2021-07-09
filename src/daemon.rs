@@ -1,4 +1,4 @@
-use crate::{get_system_status, set_system, zone};
+use crate::{get_system_status, set_system, zone, turn_off_all_zones};
 use warp::{Filter, http, reject};
 use serde::{Serialize, Deserialize};
 use crate::zone::{get_zone_from_id};
@@ -167,6 +167,9 @@ async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, wa
          inside the daemon, and we can use the "auto-off" feature to automatically turn off the zone
          if unattended.
          */
+
+        // Ensure that all zones are off
+        turn_off_all_zones();
         zone.run_zone();
     } else {
         zone.turn_off();
@@ -201,10 +204,10 @@ async fn _update_zone(_zone: zone::Zone) -> Result<impl warp::Reply, warp::Rejec
 
 async fn _update_order(_order: zone::ZoneOrder) -> Result<impl warp::Reply, warp::Rejection> {
     let zone_list = zone::get_zones();
-    let _zoneList = zone_list.clone();
+    let _zone_list = zone_list.clone();
     let mut counter = 0;
-    if _zoneList.zones.len() == _order.order.len() {
-        for zone in _zoneList.zones.iter() {
+    if _zone_list.zones.len() == _order.order.len() {
+        for zone in _zone_list.zones.iter() {
             let _zone = zone::Zone::from(zone);
             let new_order = _order.order.as_slice()[counter];
             _zone.set_order(new_order);
