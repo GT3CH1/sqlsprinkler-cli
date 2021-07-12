@@ -202,10 +202,9 @@ fn turn_off_all_zones() {
 /// Runs the system based on the schedule
 fn run_system() {
     let zone_list = zone::get_zones();
-    println!("Running system");
-        for zone in &zone_list.zones {
-            if zone.enabled {
-                zone.run_zone();
-            }
+    for zone in &zone_list.zones {
+        if zone.enabled {
+            zone.run_zone();
         }
+    }
 }
