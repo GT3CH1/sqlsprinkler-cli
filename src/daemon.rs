@@ -174,6 +174,7 @@ async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, wa
     } else {
         zone.turn_off();
     }
+    println!("Turning on zone with gpio {}", zone.gpio);
     Ok(warp::reply::with_status("Ok", http::StatusCode::OK))
 }
 
