@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 use std::convert::From;
-use std::{thread, time};
+use std::{thread, time, fmt};
 use crate::{get_pool};
 use rppal::gpio::{Gpio, OutputPin};
 use mysql::Row;
@@ -139,6 +139,12 @@ impl Clone for Zone {
             system_order: self.system_order.clone(),
             id: self.id.clone(),
         }
+    }
+}
+
+impl fmt::Display for Zone {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} | {} | {} | {} | {} | {} | {}", self.name, self.gpio, self.time, self.enabled, self.auto_off, self.system_order, self.id)
     }
 }
 
@@ -297,7 +303,7 @@ pub(crate) fn get_zones() -> ZoneList {
     let pool = get_pool();
     let mut conn = pool.get_conn().unwrap();
     let rows = conn
-        .query("SELECT Name, Gpio, Time, Enabled, AutoOff, SystemOrder, ID from Zones ORDER BY SystemOrder")
+        .query("SELECT Name, GPIO, Time, Enabled, AutoOff, SystemOrder, ID from Zones ORDER BY SystemOrder")
         .unwrap();
     let mut zone_list: Vec<Zone> = vec![];
     for row in rows {
