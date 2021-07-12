@@ -203,11 +203,9 @@ fn turn_off_all_zones() {
 fn run_system() {
     let zone_list = zone::get_zones();
     println!("Running system");
-    thread::spawn(move || {
         for zone in &zone_list.zones {
             if zone.enabled {
                 zone.run_zone();
             }
         }
-    });
 }
