@@ -62,16 +62,25 @@ impl Zone {
 
     /// Runs this zone, and automatically turn it off if launched from another thread and if
     /// `auto_off` is set to true for this zone. Will run for `time` minutes
-    pub fn run_zone(&self) {
+    pub fn run_zone_threaded(&self) {
         self.turn_on();
         if self.auto_off {
             let _zone = self.clone();
             thread::spawn(move || {
-                let run_time = time::Duration::from_secs((_zone.time * 60) as u64);
+                let run_time = time::Duration::from_secs((_zone.time * 60));
                 thread::sleep(run_time);
                 _zone.turn_off()
             });
         }
+    }
+
+    /// Runs this zone in a blocking fashion.
+    pub fn run_zone(&self) {
+        self.turn_on();
+        let _zone = self.clone();
+        let run_time = time::Duration::from_secs((_zone.time * 60));
+        thread::sleep(run_time);
+        _zone.turn_off()
     }
 
     /// Updates this zone to the given `zone` parameter.
@@ -252,7 +261,8 @@ pub fn get_zone_from_order(zone_order: i8) -> Zone {
     let mut _zone = empty_zone();
     for row in rows {
         let _row = row.unwrap();
-        let _zone = Zone::from(_row);
+        _zone = Zone::from(_row);
+        return _zone;
     }
     return _zone;
 }

@@ -170,7 +170,7 @@ async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, wa
 
         // Ensure that all zones are off
         turn_off_all_zones();
-        zone.run_zone();
+        zone.run_zone_threaded();
     } else {
         zone.turn_off();
     }
