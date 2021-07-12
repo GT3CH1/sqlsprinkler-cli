@@ -9,8 +9,8 @@ use mysql::Row;
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Zone {
     pub name: String,
-    pub gpio: i8,
-    pub time: i8,
+    pub gpio: u8,
+    pub time: u64,
     pub enabled: bool,
     pub auto_off: bool,
     pub system_order: i8,
@@ -26,18 +26,11 @@ pub struct Zone {
 // - get_zone_with_state -> Returns the zone, but with the `state` parameter as well (ZoneWithState)
 // - set_order -> Sets the system ordering for the zone.
 impl Zone {
-    /// Gets the pin of this zone
-    /// # Return
-    ///     `pin` A u8 representing the gpio pin.
-    pub(self) fn get_pin(&self) -> u8 {
-        self.gpio as u8
-    }
-
     /// Gets the gpio interface for this zone.
     /// # Return
     ///     `gpio` An OutputPin that we can use to turn the zone on or off
     pub(self) fn get_gpio(&self) -> OutputPin {
-        let pin = self.get_pin();
+        let pin = self.gpio;
         let pin = match Gpio::new() {
             Ok(gpio) => gpio.get(pin),
             Err(gpio) => Err(gpio),
@@ -210,7 +203,7 @@ pub struct ZoneDelete {
 pub struct ZoneAdd {
     pub name: String,
     pub gpio: i8,
-    pub time: i8,
+    pub time: u64,
     pub enabled: bool,
     pub auto_off: bool,
 }
@@ -218,8 +211,8 @@ pub struct ZoneAdd {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ZoneWithState {
     pub name: String,
-    pub gpio: i8,
-    pub time: i8,
+    pub gpio: u8,
+    pub time: u64,
     pub enabled: bool,
     pub auto_off: bool,
     pub system_order: i8,
