@@ -37,6 +37,7 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 * [ ] Make `sqlsprinkler zone ...` call the Web API to control turning zones on and off.
 
 ## Features added
+* [x] `sqlsprinkler-cli sys test`
 * [x] `sqlsprinkler-cli sys run`
 * [x] `sqlsprinkler-cli zone <id> <on,off,status>`
 * [x] `sqlsprinkler-cli sys <on,off>`

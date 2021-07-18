@@ -8,18 +8,17 @@ use std::{env, thread};
 use crate::zone::{Zone};
 use mysql::Pool;
 use std::str::FromStr;
+use std::process::exit;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "sqlsprinkler", about = "SQLSprinkler")]
 pub struct Opts {
-    #[structopt(short = "v", parse(from_occurrences))]
-    verbosity: u8,
+    #[structopt(short = "v", about = "Prints the version of SQLSprinkler.")]
+    version_mode: bool,
 
-    /// Launches the SQLSprinkler API web daemon.
-    #[structopt(short = "w", long = "daemon", about = "Launches the SQLSprinkler API web daemon")]
+    #[structopt(short = "w", long = "daemon", about = "Launches the SQLSprinkler API web daemon.")]
     daemon_mode: bool,
 
-    // SUBCOMMANDS
     #[structopt(subcommand)]
     commands: Option<Cli>,
 }
@@ -63,6 +62,7 @@ enum SysOpts {
     Run,
     Winterize,
     Status,
+    Test,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -73,6 +73,11 @@ struct SysStatus {
 fn main() {
     let cli = Opts::from_args();
     let daemon_mode = cli.daemon_mode;
+    let version_mode = cli.version_mode;
+    if version_mode {
+        println!("SQLSprinkler v{}", env!("CARGO_PKG_VERSION"));
+        exit(0);
+    }
     if daemon_mode {
         daemon::run();
     }
@@ -127,6 +132,12 @@ fn main() {
                         };
                         println!("The system is {}", output);
                     }
+                    SysOpts::Test => {
+                        turn_off_all_zones();
+                        for zone in zone_list.zones {
+                            zone.test_zone();
+                        }
+                    }
                 }
             }
         }
@@ -141,17 +152,22 @@ fn get_pool() -> Pool {
     let mut user = "".to_string();
     let mut pass = "".to_string();
     let mut host = "".to_string();
+    let mut err_occurred = false;
     match env::var("SQL_PASS") {
         Ok(val) => pass = val,
-        Err(e) => println!("{}", e),
+        Err(e) => err_occurred = true,
     }
     match env::var("SQL_HOST") {
         Ok(val) => host = val,
-        Err(e) => println!("{}", e),
+        Err(e) => err_occurred = true,
     }
     match env::var("SQL_USER") {
         Ok(val) => user = val,
-        Err(e) => println!("{}", e),
+        Err(e) => err_occurred = true,
+    }
+    if err_occurred {
+        println!("An error occurred.  Did you forget to set your environment variables?");
+        exit(1);
     }
     // Build the url for the connection
     let url = format!("mysql://{}:{}@{}:3306/SQLSprinkler", user.as_str(), pass.as_str(), host.as_str());

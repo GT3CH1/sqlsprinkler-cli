@@ -140,7 +140,6 @@ async fn get_sys_status() -> Result<impl warp::Reply, warp::Rejection> {
 ///     * `_status` The SysStatus object containing the value we are going to set the system status to.
 async fn set_sys_status(_status: SysStatus) -> Result<impl warp::Reply, warp::Rejection> {
     set_system(_status.system_enabled);
-    println!("{}", _status.system_enabled);
     Ok(warp::reply::with_status("Success", http::StatusCode::OK))
 }
 
@@ -174,7 +173,6 @@ async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, wa
     } else {
         zone.turn_off();
     }
-    println!("Turning on zone with gpio {}", zone.gpio);
     Ok(warp::reply::with_status("Ok", http::StatusCode::OK))
 }
 

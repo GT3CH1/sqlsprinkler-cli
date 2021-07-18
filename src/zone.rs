@@ -30,27 +30,33 @@ impl Zone {
     /// # Return
     ///     `gpio` An OutputPin that we can use to turn the zone on or off
     pub(self) fn get_gpio(&self) -> OutputPin {
-        let pin = self.gpio;
-        let pin = match Gpio::new() {
-            Ok(gpio) => gpio.get(pin),
-            Err(gpio) => Err(gpio),
-        };
-        pin.unwrap().into_output()
+        let mut pin = Gpio::new().unwrap().get(self.gpio).unwrap().into_output();
+        pin
     }
 
     /// Turns on this zone.
     pub fn turn_on(&self) {
+        println!("Turned on {}", self);
         self.get_gpio().set_low();
     }
 
     /// Turns off this zone.
     pub fn turn_off(&self) {
+        println!("Turned off {}", self);
         self.get_gpio().set_high();
     }
 
     /// Gets the name of this zone
     pub fn get_name(&self) -> String {
         self.clone().name
+    }
+
+    /// Turns the zone on for 12 seconds and then turn off.
+    pub fn test_zone(&self) {
+        self.turn_on();
+        let run_time = time::Duration::from_secs(12);
+        thread::sleep(run_time);
+        self.turn_off()
     }
 
     /// Runs this zone, and automatically turn it off if launched from another thread and if
@@ -85,7 +91,6 @@ impl Zone {
         let pool = get_pool();
         let query = format!("UPDATE Zones SET Name='{}', Gpio={}, Time={},AutoOff={},Enabled={},SystemOrder={} WHERE ID={}"
                             , zone.name, zone.gpio, zone.time, zone.auto_off, zone.enabled, zone.system_order, zone.id);
-        println!("{}", query);
         let result = match pool.prep_exec(query, ()) {
             Ok(..) => true,
             Err(..) => false
