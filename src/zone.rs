@@ -4,6 +4,7 @@ use std::{thread, time, fmt};
 use crate::{get_pool};
 use rppal::gpio::{Gpio, OutputPin};
 use mysql::Row;
+use std::error::Error;
 
 /// Represents a SQLSprinkler zone.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -26,24 +27,20 @@ pub struct Zone {
 // - get_zone_with_state -> Returns the zone, but with the `state` parameter as well (ZoneWithState)
 // - set_order -> Sets the system ordering for the zone.
 impl Zone {
-    /// Gets the gpio interface for this zone.
-    /// # Return
-    ///     `gpio` An OutputPin that we can use to turn the zone on or off
-    pub(self) fn get_gpio(&self) -> OutputPin {
-        let mut pin = Gpio::new().unwrap().get(self.gpio).unwrap().into_output();
-        pin
+    fn get_gpio(&self) -> Result<OutputPin, Box<dyn Error>> {
+        let mut pin = Gpio::new()?.get(self.gpio)?.into_output();
+        Ok(pin)
     }
-
     /// Turns on this zone.
     pub fn turn_on(&self) {
         println!("Turned on {}", self);
-        self.get_gpio().set_low();
+        self.get_gpio().unwrap().set_low();
     }
 
     /// Turns off this zone.
     pub fn turn_off(&self) {
         println!("Turned off {}", self);
-        self.get_gpio().set_high();
+        self.get_gpio().unwrap().set_high()
     }
 
     /// Gets the name of this zone
@@ -56,7 +53,7 @@ impl Zone {
         self.turn_on();
         let run_time = time::Duration::from_secs(12);
         thread::sleep(run_time);
-        self.turn_off()
+        self.turn_off();
     }
 
     /// Runs this zone, and automatically turn it off if launched from another thread and if
@@ -79,7 +76,7 @@ impl Zone {
         let _zone = self.clone();
         let run_time = time::Duration::from_secs((_zone.time * 60));
         thread::sleep(run_time);
-        _zone.turn_off()
+        self.turn_off();
     }
 
     /// Updates this zone to the given `zone` parameter.
@@ -102,7 +99,7 @@ impl Zone {
     /// # Return
     ///     `on` A bool representing whether or not this zone is on.
     pub fn is_on(&self) -> bool {
-        self.get_gpio().is_set_low()
+        self.get_gpio().unwrap().is_set_low()
     }
 
     /// Gets a representation of this zone, but also with `is_on` as bool `state`
