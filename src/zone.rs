@@ -28,7 +28,8 @@ pub struct Zone {
 // - set_order -> Sets the system ordering for the zone.
 impl Zone {
     fn get_gpio(&self) -> Result<OutputPin, Box<dyn Error>> {
-        let mut pin = Gpio::new()?.get(self.gpio)?.into_output();
+        let gpio = Gpio::new()?;
+        let mut pin = gpio.get(self.gpio)?.into_output();
         Ok(pin)
     }
     /// Turns on this zone.
@@ -40,7 +41,7 @@ impl Zone {
     /// Turns off this zone.
     pub fn turn_off(&self) {
         println!("Turned off {}", self);
-        self.get_gpio().unwrap().set_high()
+        self.get_gpio().unwrap().set_high();
     }
 
     /// Gets the name of this zone
