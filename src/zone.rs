@@ -153,21 +153,6 @@ impl fmt::Display for Zone {
     }
 }
 
-/// Converts from a borrowed zone to a non-borrowed zone.
-impl From<&Zone> for Zone {
-    fn from(item: &Zone) -> Self {
-        Zone {
-            name: item.name.clone(),
-            gpio: item.gpio,
-            time: item.time,
-            enabled: item.enabled,
-            auto_off: item.auto_off,
-            system_order: item.system_order,
-            id: item.id,
-        }
-    }
-}
-
 /// Converts a row from the MySQL database to a Zone struct.
 impl From<Row> for Zone {
     fn from(row: Row) -> Self {
