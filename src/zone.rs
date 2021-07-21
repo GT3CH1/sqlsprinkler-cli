@@ -4,6 +4,7 @@ use std::{thread, time, fmt};
 use crate::{get_pool};
 use rppal::gpio::{Gpio, OutputPin};
 use mysql::Row;
+use std::error::Error;
 
 /// Represents a SQLSprinkler zone.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -31,19 +32,24 @@ impl Zone {
     ///     `gpio` An OutputPin that we can use to turn the zone on or off
     pub(self) fn get_gpio(&self) -> OutputPin {
         let mut pin = Gpio::new().unwrap().get(self.gpio).unwrap().into_output();
+        pin.set_reset_on_drop(false);
         pin
     }
 
     /// Turns on this zone.
-    pub fn turn_on(&self) {
+    pub fn turn_on(&self) -> Result<(), Box<dyn Error>> {
         println!("Turned on {}", self);
-        self.get_gpio().set_low();
+        let mut gpio = self.get_gpio();
+        gpio.set_low();
+        Ok(())
     }
 
     /// Turns off this zone.
-    pub fn turn_off(&self) {
+    pub fn turn_off(&self) -> Result<(), Box<dyn Error>> {
+        let mut gpio = self.get_gpio();
         println!("Turned off {}", self);
-        self.get_gpio().set_high();
+        gpio.set_high();
+        Ok(())
     }
 
     /// Gets the name of this zone
@@ -56,7 +62,7 @@ impl Zone {
         self.turn_on();
         let run_time = time::Duration::from_secs(12);
         thread::sleep(run_time);
-        self.turn_off()
+        self.turn_off();
     }
 
     /// Runs this zone, and automatically turn it off if launched from another thread and if
@@ -68,7 +74,7 @@ impl Zone {
             thread::spawn(move || {
                 let run_time = time::Duration::from_secs((_zone.time * 60));
                 thread::sleep(run_time);
-                _zone.turn_off()
+                _zone.turn_off();
             });
         }
     }
@@ -79,7 +85,7 @@ impl Zone {
         let _zone = self.clone();
         let run_time = time::Duration::from_secs((_zone.time * 60));
         thread::sleep(run_time);
-        _zone.turn_off()
+        _zone.turn_off();
     }
 
     /// Updates this zone to the given `zone` parameter.
@@ -101,8 +107,9 @@ impl Zone {
     /// Gets whether or not this zone is on
     /// # Return
     ///     `on` A bool representing whether or not this zone is on.
-    pub fn is_on(&self) -> bool {
-        self.get_gpio().is_set_low()
+    pub fn is_on(&self) -> Result<bool, Box<dyn Error>> {
+        let mut pin = Gpio::new()?.get(self.gpio)?.into_output();
+        Ok(pin.is_set_low())
     }
 
     /// Gets a representation of this zone, but also with `is_on` as bool `state`
@@ -116,7 +123,7 @@ impl Zone {
             enabled: self.enabled,
             auto_off: self.auto_off,
             system_order: self.system_order,
-            state: self.is_on(),
+            state: self.is_on().unwrap(),
             id: self.id,
         };
         new_zone

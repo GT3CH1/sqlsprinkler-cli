@@ -78,6 +78,7 @@ fn main() {
         println!("SQLSprinkler v{}", env!("CARGO_PKG_VERSION"));
         exit(0);
     }
+    turn_off_all_zones();
     if daemon_mode {
         daemon::run();
     }
@@ -91,6 +92,7 @@ fn main() {
                 let my_zone: Zone = _zone_list.zones.get(id).unwrap().clone();
                 match ZoneOptsArgs::from(zone_state.state.parse().unwrap()) {
                     ZoneOptsArgs::On => {
+                        turn_off_all_zones();
                         my_zone.turn_on();
                     }
                     ZoneOptsArgs::Off => {

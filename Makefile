@@ -18,6 +18,9 @@ build:
 		@cargo build
     endif
 
+build-pi0:
+	@cross build --target arm-unknown-linux-gnueabihf
+
 install-service:
 	cp -v systemd/sqlsprinkler-daemon.service /etc/systemd/system
 
