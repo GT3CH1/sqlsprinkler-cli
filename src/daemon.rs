@@ -148,7 +148,7 @@ async fn get_zone_status() -> Result<impl warp::Reply, warp::Rejection> {
     let zone_list = zone::get_zones().clone();
     let mut zone_status_list: Vec<zone::ZoneWithState> = Vec::new();
     for zone in zone_list.zones.iter() {
-        let _zone = zone::Zone::from(zone);
+        let _zone = &zone;
         let zone_with_status = _zone.get_zone_with_state();
         zone_status_list.push(zone_with_status);
     }
@@ -210,7 +210,7 @@ async fn _update_order(_order: zone::ZoneOrder) -> Result<impl warp::Reply, warp
     let mut counter = 0;
     if _zone_list.zones.len() == _order.order.len() {
         for zone in _zone_list.zones.iter() {
-            let _zone = zone::Zone::from(zone);
+            let _zone = &zone;
             let new_order = _order.order.as_slice()[counter];
             _zone.set_order(new_order);
             counter = counter + 1;

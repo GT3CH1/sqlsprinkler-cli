@@ -34,8 +34,8 @@ impl Zone {
         let mut pin = Gpio::new().unwrap().get(self.gpio).unwrap().into_output();
         pin.set_reset_on_drop(false);
         pin
-    }
 
+    }
     /// Turns on this zone.
     pub fn turn_on(&self) -> Result<(), Box<dyn Error>> {
         println!("Turned on {}", self);
@@ -157,21 +157,6 @@ impl Clone for Zone {
 impl fmt::Display for Zone {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} | {} | {} | {} | {} | {} | {}", self.name, self.gpio, self.time, self.enabled, self.auto_off, self.system_order, self.id)
-    }
-}
-
-/// Converts from a borrowed zone to a non-borrowed zone.
-impl From<&Zone> for Zone {
-    fn from(item: &Zone) -> Self {
-        Zone {
-            name: item.name.clone(),
-            gpio: item.gpio,
-            time: item.time,
-            enabled: item.enabled,
-            auto_off: item.auto_off,
-            system_order: item.system_order,
-            id: item.id,
-        }
     }
 }
 
