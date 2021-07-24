@@ -1,7 +1,7 @@
-use crate::{get_system_status, set_system, zone, turn_off_all_zones};
+use crate::{get_system_status, set_system_status, turn_off_all_zones, sqlsprinkler};
 use warp::{Filter, http, reject};
 use serde::{Serialize, Deserialize};
-use crate::zone::{get_zone_from_order};
+use crate::sqlsprinkler::{zone, zone::get_zone_from_order, system};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct SysStatus {
@@ -15,7 +15,6 @@ impl reject::Reject for LengthMismatch {}
 
 #[tokio::main]
 pub(crate) async fn run() {
-
     // Handle get requests to /system/state -> Used to get the current state of the sys schedule
     let get_sys_status = warp::get()
         .and(warp::path("system"))
@@ -95,7 +94,7 @@ fn sys_status_put_json() -> impl Filter<Extract=(SysStatus, ), Error=warp::Rejec
 }
 
 /// Used to filter a put request to toggle a specific zone.
-fn zone_status_put_json() -> impl Filter<Extract=(zone::ZoneToggle, ), Error=warp::Rejection> + Clone {
+fn zone_status_put_json() -> impl Filter<Extract=(sqlsprinkler::zone::ZoneToggle, ), Error=warp::Rejection> + Clone {
     warp::body::content_length_limit(1024 * 16)
         .and(warp::body::json())
 }
@@ -139,13 +138,13 @@ async fn get_sys_status() -> Result<impl warp::Reply, warp::Rejection> {
 /// # Params
 ///     * `_status` The SysStatus object containing the value we are going to set the system status to.
 async fn set_sys_status(_status: SysStatus) -> Result<impl warp::Reply, warp::Rejection> {
-    set_system(_status.system_enabled);
+    set_system_status(_status.system_enabled);
     Ok(warp::reply::with_status("Success", http::StatusCode::OK))
 }
 
 /// Gets the status of all the zones.
 async fn get_zone_status() -> Result<impl warp::Reply, warp::Rejection> {
-    let zone_list = zone::get_zones().clone();
+    let zone_list = sqlsprinkler::system::get_zones().clone();
     let mut zone_status_list: Vec<zone::ZoneWithState> = Vec::new();
     for zone in zone_list.zones.iter() {
         let _zone = &zone;
@@ -205,7 +204,7 @@ async fn _update_zone(_zone: zone::Zone) -> Result<impl warp::Reply, warp::Rejec
 /// # Params
 ///     * `_order` The new ordering of the system
 async fn _update_order(_order: zone::ZoneOrder) -> Result<impl warp::Reply, warp::Rejection> {
-    let zone_list = zone::get_zones();
+    let zone_list = system::get_zones();
     let _zone_list = zone_list.clone();
     let mut counter = 0;
     if _zone_list.zones.len() == _order.order.len() {

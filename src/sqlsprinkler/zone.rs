@@ -1,10 +1,10 @@
 use serde::{Serialize, Deserialize};
 use std::convert::From;
 use std::{thread, time, fmt};
-use crate::{get_pool, get_settings};
 use rppal::gpio::{Gpio, OutputPin};
 use mysql::Row;
-use std::error::Error;
+use crate::sqlsprinkler::get_pool;
+use crate::get_settings;
 
 /// Represents a SQLSprinkler zone.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,30 +30,28 @@ impl Zone {
     /// Gets the gpio interface for this zone.
     /// # Return
     ///     `gpio` An OutputPin that we can use to turn the zone on or off
-    pub(self) fn get_gpio(&self) -> OutputPin {
+    pub fn get_gpio(&self) -> OutputPin {
         let mut pin = Gpio::new().unwrap().get(self.gpio).unwrap().into_output();
+        // tl;dr without this line, pins get reset immediately.
         pin.set_reset_on_drop(false);
         pin
-
     }
     /// Turns on this zone.
-    pub fn turn_on(&self) -> Result<(), Box<dyn Error>> {
+    pub fn turn_on(&self) {
         if get_settings().verbose {
             println!("Turned on {}", self);
         }
         let mut gpio = self.get_gpio();
         gpio.set_low();
-        Ok(())
     }
 
     /// Turns off this zone.
-    pub fn turn_off(&self) -> Result<(), Box<dyn Error>> {
+    pub fn turn_off(&self) {
         let mut gpio = self.get_gpio();
         if get_settings().verbose {
             println!("Turned off {}", self);
         }
         gpio.set_high();
-        Ok(())
     }
 
     /// Gets the name of this zone
@@ -63,6 +61,9 @@ impl Zone {
 
     /// Turns the zone on for 12 seconds and then turn off.
     pub fn test_zone(&self) {
+        if get_settings().verbose {
+            println!("Testing {}",self.name)
+        }
         self.turn_on();
         let run_time = time::Duration::from_secs(12);
         thread::sleep(run_time);
@@ -74,6 +75,7 @@ impl Zone {
     pub fn run_zone_threaded(&self) {
         self.turn_on();
         if self.auto_off {
+            // Need to clone because we are moving into a new thread.
             let _zone = self.clone();
             thread::spawn(move || {
                 let run_time = time::Duration::from_secs(_zone.time * 60);
@@ -111,9 +113,9 @@ impl Zone {
     /// Gets whether or not this zone is on
     /// # Return
     ///     `on` A bool representing whether or not this zone is on.
-    pub fn is_on(&self) -> Result<bool, Box<dyn Error>> {
-        let mut pin = Gpio::new()?.get(self.gpio)?.into_output();
-        Ok(pin.is_set_low())
+    pub fn is_on(&self) -> bool {
+        let gpio = self.get_gpio();
+        gpio.is_set_low()
     }
 
     /// Gets a representation of this zone, but also with `is_on` as bool `state`
@@ -127,7 +129,7 @@ impl Zone {
             enabled: self.enabled,
             auto_off: self.auto_off,
             system_order: self.system_order,
-            state: self.is_on().unwrap(),
+            state: self.is_on(),
             id: self.id,
         };
         new_zone
@@ -160,6 +162,7 @@ impl Clone for Zone {
 
 impl fmt::Display for Zone {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        //NOTE: Dear god why did I think this was a good format.
         write!(f, "{} | {} | {} | {} | {} | {} | {}", self.name, self.gpio, self.time, self.enabled, self.auto_off, self.system_order, self.id)
     }
 }
@@ -215,6 +218,7 @@ pub struct ZoneAdd {
     pub auto_off: bool,
 }
 
+/// Used when we want to get a zone with whether or not it is turned on.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ZoneWithState {
     pub name: String,
@@ -232,20 +236,18 @@ pub struct ZoneList {
     pub zones: Vec<Zone>,
 }
 
-/// Creates an empty zone
-/// # Return
-///     An empty zone.
-pub fn empty_zone() -> Zone {
-    let empty_zone = Zone {
-        name: "".to_string(),
-        gpio: 0,
-        time: 0,
-        enabled: false,
-        auto_off: false,
-        system_order: 0,
-        id: 0,
-    };
-    empty_zone
+impl ::std::default::Default for Zone {
+    fn default() -> Zone {
+        Zone {
+            name: "".to_string(),
+            gpio: 0,
+            time: 0,
+            enabled: false,
+            auto_off: false,
+            system_order: 0,
+            id: 0,
+        }
+    }
 }
 
 /// Gets a zone from the given id
@@ -258,10 +260,10 @@ pub fn get_zone_from_order(zone_order: i8) -> Zone {
     let mut conn = pool.get_conn().unwrap();
     let query = format!("SELECT Name, Gpio, Time, Enabled, AutoOff, SystemOrder, ID from Zones WHERE SystemOrder={}", zone_order);
     if get_settings().verbose {
-        println!("{}",query);
+        println!("{}", query);
     }
     let rows = conn.query(query).unwrap();
-    let mut _zone = empty_zone();
+    let mut _zone = Zone::default();
     for row in rows {
         let _row = row.unwrap();
         _zone = Zone::from(_row);
@@ -273,15 +275,21 @@ pub fn get_zone_from_order(zone_order: i8) -> Zone {
 /// Deletes the given zone
 /// # Params
 ///     * `_zone` The zone we are deleting
+/// # Return
+///     * a bool representing if the deletion was successful (true) or not (false)
 pub fn delete_zone(_zone: ZoneDelete) -> bool {
     let pool = get_pool();
     let query = format!("DELETE FROM `Zones` WHERE id = {}", _zone.id);
     if get_settings().verbose {
-        println!("{}",query);
+        println!("{}", query);
     }
     let result = match pool.prep_exec(query, ()) {
         Ok(..) => true,
-        Err(..) => false,
+        Err(..) => {
+            if get_settings().verbose {
+                println!("An error occurred while deleting ")
+            }
+        },
     };
     result
 }
@@ -290,43 +298,23 @@ pub fn delete_zone(_zone: ZoneDelete) -> bool {
 /// # Params
 ///     * `_zone` The new zone we want to add.
 ///     * `pool` The MySQL connection pool to use.
-pub(crate) fn add_new_zone(_zone: ZoneAdd) -> bool {
+/// # Return
+///     * A bool representing whether or not the insert was successful (true) or failed (false)
+pub fn add_new_zone(_zone: ZoneAdd) -> bool {
     let pool = get_pool();
     let query = format!("INSERT into `Zones` (`Name`, `Gpio`, `Time`, `AutoOff`, `Enabled`) VALUES \
      ( '{}','{}','{}',{},{} )", _zone.name, _zone.gpio, _zone.time, _zone.auto_off, _zone.enabled);
     if get_settings().verbose {
-        println!("{}",query);
+        println!("{}", query);
     }
     let result = match pool.prep_exec(query, ()) {
         Ok(..) => true,
-        Err(..) => false,
+        Err(e) => {
+            if get_settings().verbose {
+                println!("An error occurred while creating a new zone: {}",e)
+                false
+            }
+        },
     };
     result
-}
-
-/// Gets a list of all the zones in this database
-/// # Arguments
-///     * `pool` The SQL connection pool to use to query for zones
-/// # Returns
-///     * `Vec<Zone>` A list of all the zones in the database.
-pub(crate) fn get_zones() -> ZoneList {
-    let pool = get_pool();
-    let mut conn = pool.get_conn().unwrap();
-    let query = "SELECT Name, GPIO, Time, Enabled, AutoOff, SystemOrder, ID from Zones ORDER BY SystemOrder";
-    let rows = conn
-        .query(query)
-        .unwrap();
-    if get_settings().verbose {
-        println!("{}",query);
-    }
-    let mut zone_list: Vec<Zone> = vec![];
-    for row in rows {
-        let _row = row.unwrap();
-        let zone = Zone::from(_row);
-        zone_list.push(zone);
-    }
-    let list = ZoneList {
-        zones: zone_list
-    };
-    return list;
 }
