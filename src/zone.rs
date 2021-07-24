@@ -72,7 +72,7 @@ impl Zone {
         if self.auto_off {
             let _zone = self.clone();
             thread::spawn(move || {
-                let run_time = time::Duration::from_secs((_zone.time * 60));
+                let run_time = time::Duration::from_secs(_zone.time * 60);
                 thread::sleep(run_time);
                 _zone.turn_off();
             });
@@ -83,7 +83,7 @@ impl Zone {
     pub fn run_zone(&self) {
         self.turn_on();
         let _zone = self.clone();
-        let run_time = time::Duration::from_secs((_zone.time * 60));
+        let run_time = time::Duration::from_secs(_zone.time * 60);
         thread::sleep(run_time);
         _zone.turn_off();
     }
