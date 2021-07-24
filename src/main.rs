@@ -260,6 +260,7 @@ fn get_system_status() -> bool {
                     }
                 }).collect()
             }).unwrap();
+    //TODO: Rewrite this method so this ugly line does not need to exist.
     return sys_status[0].status;
 }
 
