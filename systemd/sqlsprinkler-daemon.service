@@ -3,6 +3,7 @@ Description=API backbone for SQLSprinkler
 After=network-online.target
 
 [Service]
+Type=simple
 Environment=SQL_PASS="X4vJOQVCF8WnnoJq"
 Environment=SQL_HOST="localhost"
 Environment=SQL_USER="web"

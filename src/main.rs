@@ -10,7 +10,7 @@ use crate::zone::{Zone};
 use mysql::Pool;
 use std::str::FromStr;
 use std::process::exit;
-use std::sync::RwLock;
+use parking_lot::{RwLockReadGuard, RwLock};
 
 #[macro_use]
 extern crate lazy_static;
@@ -81,13 +81,15 @@ struct MyConfig {
     sqlsprinkler_pass: String,
     sqlsprinkler_host: String,
     sqlsprinkler_db: String,
+    verbose: bool,
 }
 
 lazy_static! {
     static ref SETTINGS: RwLock<MyConfig> = RwLock::new(MyConfig::default());
 }
 
-/// `MyConfig` implements `Default`
+const SETTINGS_FILE_PATH: &str = "/etc/sqlsprinkler/sqlsprinkler.conf";
+
 impl ::std::default::Default for MyConfig {
     fn default() -> Self {
         Self {
@@ -95,6 +97,7 @@ impl ::std::default::Default for MyConfig {
             sqlsprinkler_pass: "".to_string(),
             sqlsprinkler_host: "".to_string(),
             sqlsprinkler_db: "".to_string(),
+            verbose: false,
         }
     }
 }
@@ -106,28 +109,29 @@ impl Clone for MyConfig {
             sqlsprinkler_pass: self.sqlsprinkler_pass.clone(),
             sqlsprinkler_host: self.sqlsprinkler_host.clone(),
             sqlsprinkler_db: self.sqlsprinkler_db.clone(),
+            verbose: self.verbose,
         }
     }
 }
 
-pub fn read_settings() -> Result<(), confy::ConfyError> {
+/// Read the settings file from `/etc/sqlsprinlker/sqlsprinkler.conf` and load into memory.
+fn read_settings() -> Result<(), confy::ConfyError> {
     let mut new_settings = SETTINGS.write().unwrap().clone();
-    new_settings = confy::load_path("/etc/sqlsprinkler/sqlsprinkler.conf")?;
-    println!("The configuration is:");
-    println!("{:#?}", new_settings);
-    println!("Read settings successfully.");
+    new_settings = confy::load_path(SETTINGS_FILE_PATH)?;
     let mut settings = SETTINGS.write().unwrap();
     *settings = new_settings;
     Ok(())
 }
 
+fn get_settings() -> RwLockReadGuard<MyConfig> {
+    SETTINGS.read().unwrap()
+}
 
 fn main() {
     let cli = Opts::from_args();
     let daemon_mode = cli.daemon_mode;
     let version_mode = cli.version_mode;
     read_settings();
-    println!("{:?}", SETTINGS.read().unwrap());
     if version_mode {
         println!("SQLSprinkler v{}", env!("CARGO_PKG_VERSION"));
         exit(0);
@@ -162,23 +166,33 @@ fn main() {
             Cli::Sys(sys_opts) => {
                 match sys_opts {
                     SysOpts::On => {
-                        println!("Enable system schedule");
+                        if get_settings().verbose {
+                            println!("Enabled system schedule");
+                        }
                         set_system(true);
                     }
                     SysOpts::Off => {
-                        println!("Disabling system schedule.");
+                        if get_settings().verbose {
+                            println!("Disabling system schedule.");
+                        }
                         set_system(false);
                     }
                     SysOpts::Run => {
                         if get_system_status() {
-                            println!("Running the system schedule.");
+                            if get_settings().verbose {
+                                println!("Running the system schedule.");
+                            }
                             run_system();
                         } else {
-                            println!("System is not enabled, refusing.");
+                            if get_settings().verbose {
+                                println!("System is not enabled, refusing.");
+                            }
                         }
                     }
                     SysOpts::Winterize => {
-                        println!("Winterizing the system.");
+                        if get_settings().verbose {
+                            println!("Winterizing the system.");
+                        }
                     }
                     SysOpts::Status => {
                         let system_status = get_system_status();
@@ -206,8 +220,8 @@ fn main() {
 fn get_pool() -> Pool {
     // Build the url for the connection
     let reader = SETTINGS.read().unwrap();
-    let url = format!("mysql://{}:{}@{}:3306/{}}",
-                      reader.sqlsprinkler_user, reader.sqlsprinkler_pass, reader.sqlsprinkler_host,reader.sqlsprinkler_db);
+    let url = format!("mysql://{}:{}@{}:3306/{}",
+                      reader.sqlsprinkler_user, reader.sqlsprinkler_pass, reader.sqlsprinkler_host, reader.sqlsprinkler_db);
 
     let pool = match mysql::Pool::new(url) {
         Ok(p) => p,

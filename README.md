@@ -29,14 +29,17 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
     - Turn the given zone on or off
 * `sqlsprinkler-cli sys <on,off,winterize,run,status>`
     - Operate on the system.
+* You can set the database username, password, and host in the `/etc/sqlsprinkler/sqlsprinkler.conf` configuration file.
 
 ## TODO
 * [ ] Implement `sqlsprinkler-cli sys winterize (test?)`
     *   Run each system for 10 seconds, and then sleep for 3 minutess
 * [ ] A and B days
 * [ ] Make `sqlsprinkler zone ...` call the Web API to control turning zones on and off.
+* [ ] Better error messages
 
 ## Features added
+* [x] A configuration file at `/etc/sqlsprinkler/sqlsprinkler.conf` 
 * [x] `sqlsprinkler-cli sys test`
 * [x] `sqlsprinkler-cli sys run`
 * [x] `sqlsprinkler-cli zone <id> <on,off,status>`
@@ -80,3 +83,7 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 * Export your SQL password, user, and host as environment variables.
     - ie, `export SQL_PASS='password123' ; export SQL_HOST='host' ; export SQL_USER='user'`
 * run your wanted sqlsprinkler command, and enjoy!
+
+## About the config
+- The settings prefixed with `sqlsprinkler_` should be pretty self explanitory.
+- `verbose` Possible values: true/false → enables verbose logging.
