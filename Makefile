@@ -26,4 +26,4 @@ install-service:
 
 install: build install-service
 	cp -v target/armv7-unknown-linux-gnueabihf/debug/sqlsprinkler-cli /usr/bin/sqlsprinkler
-	install -dm755 /etc/sqlsprinkler
+	install -Dm755 conf/sqlsprinkler.conf /etc/sqlsprinkler/sqlsprinkler.conf
