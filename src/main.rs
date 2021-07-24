@@ -10,7 +10,8 @@ use crate::zone::{Zone};
 use mysql::Pool;
 use std::str::FromStr;
 use std::process::exit;
-use parking_lot::{RwLockReadGuard, RwLock};
+use parking_lot::{RwLockReadGuard};
+use std::sync::RwLock;
 
 #[macro_use]
 extern crate lazy_static;
@@ -116,15 +117,13 @@ impl Clone for MyConfig {
 
 /// Read the settings file from `/etc/sqlsprinlker/sqlsprinkler.conf` and load into memory.
 fn read_settings() -> Result<(), confy::ConfyError> {
-    let mut new_settings = SETTINGS.write().unwrap().clone();
-    new_settings = confy::load_path(SETTINGS_FILE_PATH)?;
-    let mut settings = SETTINGS.write().unwrap();
-    *settings = new_settings;
+    let mut new_settings = SETTINGS.write().unwrap();
+    *new_settings = confy::load_path(SETTINGS_FILE_PATH)?;
     Ok(())
 }
 
-fn get_settings() -> RwLockReadGuard<MyConfig> {
-    SETTINGS.read().unwrap()
+fn get_settings() -> MyConfig {
+    SETTINGS.read().unwrap().clone()
 }
 
 fn main() {
@@ -219,7 +218,7 @@ fn main() {
 ///     `Pool` A connection to the SQL database.
 fn get_pool() -> Pool {
     // Build the url for the connection
-    let reader = SETTINGS.read().unwrap();
+    let reader = get_settings();
     let url = format!("mysql://{}:{}@{}:3306/{}",
                       reader.sqlsprinkler_user, reader.sqlsprinkler_pass, reader.sqlsprinkler_host, reader.sqlsprinkler_db);
 
