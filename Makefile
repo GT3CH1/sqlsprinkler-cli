@@ -56,11 +56,20 @@ deb:
 	@touch $(ROOT)/DEBIAN/control
 	@install -Dm755 conf/preinst $(ROOT)/debian/preinst
 	@install -Dm755 conf/postinst $(ROOT)/debian/postinst
+    ifeq ($(ARCH),armv7)
 	@echo "Package: sqlsprinkler \n\
 Version: $(VERSION) \n\
-Architecture: $(ARCH) \n\
+Architecture: armhf \n\
 Maintainer: Gavin Pease <gavinpease@gmail.com> \n\
 Description: The command line and daemon for sqlsprinkler" > $(ROOT)/DEBIAN/control
+	endif
+	ifeq ($(ARCH),arm)
+	@echo "Package: sqlsprinkler \n\
+    Version: $(VERSION) \n\
+    Architecture: $(ARCH) \n\
+    Maintainer: Gavin Pease <gavinpease@gmail.com> \n\
+    Description: The command line and daemon for sqlsprinkler" > $(ROOT)/DEBIAN/control
+	endif
 	@chmod 755 -R $(ROOT)/DEBIAN
 	@dpkg-deb --build --root-owner-group $(ROOT)
 
