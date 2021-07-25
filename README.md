@@ -32,6 +32,7 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 * You can set the database username, password, and host in the `/etc/sqlsprinkler/sqlsprinkler.conf` configuration file.
 
 ## TODO
+* [ ] Create tables and databases if they do not exist.
 * [ ] Implement `sqlsprinkler-cli sys winterize (test?)`
     *   Run each system for 10 seconds, and then sleep for 3 minutess
 * [ ] A and B days
@@ -83,8 +84,8 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 
 ## How-to-use
 
-* Export your SQL password, user, and host as environment variables.
-    - ie, `export SQL_PASS='password123' ; export SQL_HOST='host' ; export SQL_USER='user'`
+* Run the program once, as `sudo`, you will get a connection error.
+* Set your username, password, host, and database in `/etc/sqlsprinkler/sqlsprinkler.conf`
 * run your wanted sqlsprinkler command, and enjoy!
 
 ## About the config
