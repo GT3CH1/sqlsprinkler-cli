@@ -3,12 +3,18 @@
 mod daemon;
 mod zone;
 
+use serde::{Serialize, Deserialize};
 use structopt::StructOpt;
-use std::{env, thread};
+use std::env;
 use crate::zone::{Zone};
 use mysql::Pool;
 use std::str::FromStr;
 use std::process::exit;
+use parking_lot::{RwLockReadGuard};
+use std::sync::RwLock;
+
+#[macro_use]
+extern crate lazy_static;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "sqlsprinkler", about = "SQLSprinkler")]
@@ -70,10 +76,61 @@ struct SysStatus {
     status: bool,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct MyConfig {
+    sqlsprinkler_user: String,
+    sqlsprinkler_pass: String,
+    sqlsprinkler_host: String,
+    sqlsprinkler_db: String,
+    verbose: bool,
+}
+
+lazy_static! {
+    static ref SETTINGS: RwLock<MyConfig> = RwLock::new(MyConfig::default());
+}
+
+const SETTINGS_FILE_PATH: &str = "/etc/sqlsprinkler/sqlsprinkler.conf";
+
+impl ::std::default::Default for MyConfig {
+    fn default() -> Self {
+        Self {
+            sqlsprinkler_user: "".to_string(),
+            sqlsprinkler_pass: "".to_string(),
+            sqlsprinkler_host: "".to_string(),
+            sqlsprinkler_db: "".to_string(),
+            verbose: false,
+        }
+    }
+}
+
+impl Clone for MyConfig {
+    fn clone(&self) -> MyConfig {
+        MyConfig {
+            sqlsprinkler_user: self.sqlsprinkler_user.clone(),
+            sqlsprinkler_pass: self.sqlsprinkler_pass.clone(),
+            sqlsprinkler_host: self.sqlsprinkler_host.clone(),
+            sqlsprinkler_db: self.sqlsprinkler_db.clone(),
+            verbose: self.verbose,
+        }
+    }
+}
+
+/// Read the settings file from `/etc/sqlsprinlker/sqlsprinkler.conf` and load into memory.
+fn read_settings() -> Result<(), confy::ConfyError> {
+    let mut new_settings = SETTINGS.write().unwrap();
+    *new_settings = confy::load_path(SETTINGS_FILE_PATH)?;
+    Ok(())
+}
+
+fn get_settings() -> MyConfig {
+    SETTINGS.read().unwrap().clone()
+}
+
 fn main() {
     let cli = Opts::from_args();
     let daemon_mode = cli.daemon_mode;
     let version_mode = cli.version_mode;
+    read_settings();
     if version_mode {
         println!("SQLSprinkler v{}", env!("CARGO_PKG_VERSION"));
         exit(0);
@@ -108,23 +165,33 @@ fn main() {
             Cli::Sys(sys_opts) => {
                 match sys_opts {
                     SysOpts::On => {
-                        println!("Enable system schedule");
+                        if get_settings().verbose {
+                            println!("Enabled system schedule");
+                        }
                         set_system(true);
                     }
                     SysOpts::Off => {
-                        println!("Disabling system schedule.");
+                        if get_settings().verbose {
+                            println!("Disabling system schedule.");
+                        }
                         set_system(false);
                     }
                     SysOpts::Run => {
                         if get_system_status() {
-                            println!("Running the system schedule.");
+                            if get_settings().verbose {
+                                println!("Running the system schedule.");
+                            }
                             run_system();
                         } else {
-                            println!("System is not enabled, refusing.");
+                            if get_settings().verbose {
+                                println!("System is not enabled, refusing.");
+                            }
                         }
                     }
                     SysOpts::Winterize => {
-                        println!("Winterizing the system.");
+                        if get_settings().verbose {
+                            println!("Winterizing the system.");
+                        }
                     }
                     SysOpts::Status => {
                         let system_status = get_system_status();
@@ -150,32 +217,19 @@ fn main() {
 /// # Return
 ///     `Pool` A connection to the SQL database.
 fn get_pool() -> Pool {
-    // Get the SQL database password, parse it.
-    let mut user = "".to_string();
-    let mut pass = "".to_string();
-    let mut host = "".to_string();
-    let mut err_occurred = false;
-    match env::var("SQL_PASS") {
-        Ok(val) => pass = val,
-        Err(e) => err_occurred = true,
-    }
-    match env::var("SQL_HOST") {
-        Ok(val) => host = val,
-        Err(e) => err_occurred = true,
-    }
-    match env::var("SQL_USER") {
-        Ok(val) => user = val,
-        Err(e) => err_occurred = true,
-    }
-    if err_occurred {
-        println!("An error occurred.  Did you forget to set your environment variables?");
-        exit(1);
-    }
     // Build the url for the connection
-    let url = format!("mysql://{}:{}@{}:3306/SQLSprinkler", user.as_str(), pass.as_str(), host.as_str());
+    let reader = get_settings();
+    let url = format!("mysql://{}:{}@{}:3306/{}",
+                      reader.sqlsprinkler_user, reader.sqlsprinkler_pass, reader.sqlsprinkler_host, reader.sqlsprinkler_db);
 
-    let pool = mysql::Pool::new(url).unwrap();
-    return pool;
+    let pool = match mysql::Pool::new(url) {
+        Ok(p) => p,
+        Err(_e) => {
+            println!("Could not connect! Did you set the username/password correctly?");
+            exit(1);
+        }
+    };
+    pool
 }
 
 /// Enables or disables the system schedule
@@ -206,6 +260,7 @@ fn get_system_status() -> bool {
                     }
                 }).collect()
             }).unwrap();
+    //TODO: Rewrite this method so this ugly line does not need to exist.
     return sys_status[0].status;
 }
 
