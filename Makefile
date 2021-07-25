@@ -72,4 +72,3 @@ Description: The command line and daemon for sqlsprinkler" > $(ROOT)/DEBIAN/cont
     endif
 	@chmod 755 -R $(ROOT)/DEBIAN
 	@dpkg-deb --build --root-owner-group $(ROOT)
-a
