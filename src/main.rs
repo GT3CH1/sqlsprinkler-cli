@@ -139,15 +139,15 @@ fn main() {
         exit(0);
     }
 
-    turn_off_all_zones();
     if daemon_mode {
+        turn_off_all_zones();
         daemon::run();
     }
-    let zone_list = sqlsprinkler::system::get_zones();
     if let Some(subcommand) = cli.commands {
         match subcommand {
             // `sqlsprinkler zone ...`
             Cli::Zone(zone_state) => {
+                let zone_list = sqlsprinkler::system::get_zones();
                 let id = usize::from(zone_state.id);
                 let _zone_list = zone_list;
                 let my_zone: Zone = _zone_list.zones.get(id).unwrap().clone();
