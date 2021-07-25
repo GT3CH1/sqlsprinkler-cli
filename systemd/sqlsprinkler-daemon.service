@@ -14,4 +14,4 @@ User=pi
 Group=gpio
 
 [Install]
-WantedBy=multi-user
+WantedBy=multi-user.target
