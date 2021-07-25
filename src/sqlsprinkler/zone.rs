@@ -62,7 +62,7 @@ impl Zone {
     /// Turns the zone on for 12 seconds and then turn off.
     pub fn test_zone(&self) {
         if get_settings().verbose {
-            println!("Testing {}",self.name)
+            println!("Testing {}", self.name)
         }
         self.turn_on();
         let run_time = time::Duration::from_secs(12);
@@ -290,7 +290,7 @@ pub fn delete_zone(_zone: ZoneDelete) -> bool {
                 println!("An error occurred while deleting ")
             }
             false
-        },
+        }
     };
     result
 }
@@ -312,10 +312,10 @@ pub fn add_new_zone(_zone: ZoneAdd) -> bool {
         Ok(..) => true,
         Err(e) => {
             if get_settings().verbose {
-                println!("An error occurred while creating a new zone: {}",e);
+                println!("An error occurred while creating a new zone: {}", e);
             }
             false
-        },
+        }
     };
     result
 }
