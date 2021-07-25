@@ -128,7 +128,10 @@ fn main() {
 
     match read_settings(){
         Ok(..) => (),
-        Err(e) => println!("An error occurred while reading the config file: {}",e),
+        Err(e) => {
+            println!("An error occurred while reading the config file: {}",e);
+            exit(1)
+        },
     };
 
     if version_mode {
