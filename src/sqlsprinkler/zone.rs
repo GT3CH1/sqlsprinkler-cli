@@ -311,7 +311,7 @@ pub fn add_new_zone(_zone: ZoneAdd) -> bool {
         Ok(..) => true,
         Err(e) => {
             if get_settings().verbose {
-                println!("An error occurred while creating a new zone: {}",e)
+                println!("An error occurred while creating a new zone: {}",e);
                 false
             }
         },
