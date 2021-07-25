@@ -5,7 +5,7 @@ use std::process::exit;
 use std::str::FromStr;
 use std::sync::RwLock;
 
-    use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 
 use sqlsprinkler::daemon;

@@ -77,6 +77,9 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 * warp 0.3
 * parking_lot 0.10.0
 * rppal 0.12.0
+* chrono 0.3.0
+* confy 0.4.0
+* lazy_static 1.4.0
 
 ## How-to-use
 
