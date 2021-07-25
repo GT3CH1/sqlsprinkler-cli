@@ -56,6 +56,7 @@ deb:
 	@touch $(ROOT)/DEBIAN/control
 	@install -Dm755 conf/preinst $(ROOT)/debian/preinst
 	@install -Dm755 conf/postinst $(ROOT)/debian/postinst
+	@install -Dm755 conf/conffiles $(ROOT)/debian/conffiles
     ifeq ($(ARCH),armv7)
 		@echo "Package: sqlsprinkler\n\
 Version: $(VERSION)\n\
