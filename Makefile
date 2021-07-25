@@ -51,7 +51,7 @@ deb:
 	@install -dm755 $(ROOT)
 	@install -Dm755 target/$(ARCH)-unknown-linux-gnueabihf/debug/sqlsprinkler-cli $(ROOT)/usr/bin/sqlsprinkler
 	@install -Dm755 conf/sqlsprinkler.conf $(ROOT)/etc/sqlsprinkler/sqlsprinkler.conf
-	@install -Dm755 systemd/sqlsprinkler-daemon.service $(ROOT)/etc/systemd/system/sqlsprinkler-daemon.service
+	@install -Dm755 systemd/sqlsprinkler-daemon.service $(ROOT)/lib/systemd/system/sqlsprinkler-daemon.service
 	@install -dm755 $(ROOT)/DEBIAN
 	@touch $(ROOT)/DEBIAN/control
 	@install -Dm755 conf/preinst $(ROOT)/debian/preinst
