@@ -144,10 +144,10 @@ fn main() {
         daemon::run();
     }
     if let Some(subcommand) = cli.commands {
+        let zone_list = sqlsprinkler::system::get_zones();
         match subcommand {
             // `sqlsprinkler zone ...`
             Cli::Zone(zone_state) => {
-                let zone_list = sqlsprinkler::system::get_zones();
                 let id = usize::from(zone_state.id);
                 let _zone_list = zone_list;
                 let my_zone: Zone = _zone_list.zones.get(id).unwrap().clone();
