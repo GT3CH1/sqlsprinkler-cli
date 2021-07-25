@@ -54,6 +54,8 @@ deb:
 	@install -Dm755 systemd/sqlsprinkler-daemon.service $(ROOT)/etc/systemd/system/sqlsprinkler-daemon.service
 	@install -dm755 $(ROOT)/DEBIAN
 	@touch $(ROOT)/DEBIAN/control
+	@install -Dm755 conf/preinst $(ROOT)/debian/preinst
+	@install -Dm755 conf/postinst $(ROOT)/debian/postinst
 	@echo "Package: sqlsprinkler \n\
 Version: $(VERSION) \n\
 Architecture: $(ARCH) \n\
