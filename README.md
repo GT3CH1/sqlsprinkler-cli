@@ -1,4 +1,4 @@
-# sqlsprinkler-cli 0.1.1
+# sqlsprinkler-cli 0.1.2
 
 A command line interface for the SQLSprinkler project
 
