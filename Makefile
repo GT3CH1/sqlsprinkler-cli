@@ -50,14 +50,15 @@ deb:
     endif
 	@install -dm755 $(ROOT)
 	@install -Dm755 target/$(ARCH)-unknown-linux-gnueabihf/debug/sqlsprinkler-cli $(ROOT)/usr/bin/sqlsprinkler
-	install -Dm755 conf/sqlsprinkler.conf $(ROOT)/etc/sqlsprinkler/sqlsprinkler.conf
-	install -dm755 $(ROOT)/DEBIAN
-	touch $(ROOT)/DEBIAN/control
-	echo "Package: sqlsprinkler \n\
+	@install -Dm755 conf/sqlsprinkler.conf $(ROOT)/etc/sqlsprinkler/sqlsprinkler.conf
+	@install -Dm755 systemd/sqlsprinkler-daemon.service $(ROOT)/etc/systemd/system/sqlsprinkler-daemon.service
+	@install -dm755 $(ROOT)/DEBIAN
+	@touch $(ROOT)/DEBIAN/control
+	@echo "Package: sqlsprinkler \n\
 Version: $(VERSION) \n\
 Architecture: $(ARCH) \n\
 Maintainer: Gavin Pease <gavinpease@gmail.com> \n\
 Description: The command line and daemon for sqlsprinkler" > $(ROOT)/DEBIAN/control
-	chmod 755 -R $(ROOT)/DEBIAN
-	dpkg-deb --build --root-owner-group $(ROOT)
+	@chmod 755 -R $(ROOT)/DEBIAN
+	@dpkg-deb --build --root-owner-group $(ROOT)
 
