@@ -289,6 +289,7 @@ pub fn delete_zone(_zone: ZoneDelete) -> bool {
             if get_settings().verbose {
                 println!("An error occurred while deleting ")
             }
+            false
         },
     };
     result
@@ -312,8 +313,8 @@ pub fn add_new_zone(_zone: ZoneAdd) -> bool {
         Err(e) => {
             if get_settings().verbose {
                 println!("An error occurred while creating a new zone: {}",e);
-                false
             }
+            false
         },
     };
     result
