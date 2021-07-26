@@ -45,7 +45,7 @@ pub(crate) fn get_system_status() -> bool {
 ///     * `pool` The SQL connection pool to use to query for zones
 /// # Returns
 ///     * `Vec<Zone>` A list of all the zones in the database.
-pub fn get_zones() -> zone::ZoneList {
+pub(crate) fn get_zones() -> zone::ZoneList {
     let pool = get_pool();
     let mut conn = pool.get_conn().unwrap();
     let query = "SELECT Name, GPIO, Time, Enabled, AutoOff, SystemOrder, ID from Zones ORDER BY SystemOrder";
@@ -76,5 +76,13 @@ pub fn run() {
         if zone.enabled {
             zone.run_zone();
         }
+    }
+}
+
+/// Turns off all the zones in the system
+pub(crate) fn turn_off_all_zones() {
+    let zone_list = get_zones();
+    for zone_in_list in &zone_list.zones {
+        zone_in_list.turn_off();
     }
 }
