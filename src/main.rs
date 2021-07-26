@@ -160,7 +160,13 @@ fn main() {
             Cli::Zone(zone_state) => {
                 let id = usize::from(zone_state.id);
                 let _zone_list = zone_list;
-                let my_zone: Zone = _zone_list.zones.get(id).unwrap().clone();
+                let my_zone: &Zone = match _zone_list.zones.get(id) {
+                    Some(z) => z,
+                    None => {
+                        println!("Zone id not found.");
+                        exit(-1);
+                    }
+                };
                 match ZoneOptsArgs::from(zone_state.state.parse().unwrap()) {
                     ZoneOptsArgs::On => {
                         turn_off_all_zones();
