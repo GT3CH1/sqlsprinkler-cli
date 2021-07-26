@@ -78,3 +78,11 @@ pub fn run() {
         }
     }
 }
+
+/// Turns off all the zones in the system
+pub(crate) fn turn_off_all_zones() {
+    let zone_list = get_zones();
+    for zone_in_list in &zone_list.zones {
+        zone_in_list.turn_off();
+    }
+}

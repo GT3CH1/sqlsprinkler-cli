@@ -10,7 +10,8 @@ use structopt::StructOpt;
 
 use sqlsprinkler::daemon;
 use crate::sqlsprinkler::zone::Zone;
-use crate::sqlsprinkler::system::{get_system_status, set_system_status};
+use crate::sqlsprinkler::system::{get_system_status, set_system_status, turn_off_all_zones};
+
 mod sqlsprinkler;
 
 #[macro_use]
@@ -55,7 +56,10 @@ impl FromStr for ZoneOptsArgs {
             "on" => Ok(ZoneOptsArgs::On),
             "off" => Ok(ZoneOptsArgs::Off),
             "status" => Ok(ZoneOptsArgs::Status),
-            _ => Err(()),
+            _ => {
+                println!("Unrecognized subcommand.");
+                exit(1);
+            }
         }
     }
 }
@@ -63,15 +67,21 @@ impl FromStr for ZoneOptsArgs {
 
 #[derive(StructOpt, Debug)]
 enum SysOpts {
+    /// Enables the system schedule
     On,
+    /// Disables the system schedule
     Off,
+    /// Runs the system
     Run,
+    /// Runs the winterizing schedule
     Winterize,
+    /// Prints the status of the system.
     Status,
+    /// Tests the system.
     Test,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 struct MyConfig {
     sqlsprinkler_user: String,
     sqlsprinkler_pass: String,
@@ -126,12 +136,12 @@ fn main() {
     let daemon_mode = cli.daemon_mode;
     let version_mode = cli.version_mode;
 
-    match read_settings(){
+    match read_settings() {
         Ok(..) => (),
         Err(e) => {
-            println!("An error occurred while reading the config file: {}",e);
+            println!("An error occurred while reading the config file: {}", e);
             exit(1)
-        },
+        }
     };
 
     if version_mode {
@@ -215,14 +225,5 @@ fn main() {
                 }
             }
         }
-    }
-}
-
-/// Turns off all the zones in the system
-//TODO: Should this live here?
-fn turn_off_all_zones() {
-    let zone_list = sqlsprinkler::system::get_zones();
-    for zone_in_list in &zone_list.zones {
-        zone_in_list.turn_off();
     }
 }
