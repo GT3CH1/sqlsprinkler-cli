@@ -29,6 +29,10 @@ install-service:
 install: build
 	dpkg -i $(ROOT).deb
 
+clean:
+	rm *.deb
+	rm -rf ./$(ROOT)/
+
 deb: build-arm
 	@install -dm755 $(ROOT)
 	@install -Dm755 target/arm-unknown-linux-gnueabihf/debug/sqlsprinkler-cli $(ROOT)/usr/bin/sqlsprinkler
