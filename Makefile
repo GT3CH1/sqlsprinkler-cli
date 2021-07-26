@@ -34,22 +34,9 @@ install: build install-service
 	install -Dm755 conf/sqlsprinkler.conf /etc/sqlsprinkler/sqlsprinkler.conf
 
 
-deb:
-    ifeq ($(RELEASE),true)
-	RELEASE_FLAG := --release
-	dir =
-    endif
-    ifeq ($(filter arm armv7,$(ARCH)),)
-		$(error Architecture not supported, valid architectures are arm | armv7)
-    endif
-    ifeq ($(ARCH),arm)
-		@ $(MAKE) build-arm
-    endif
-    ifeq ($(ARCH),armv7)
-		@ $(MAKE) build-armv7
-    endif
+deb: build-arm
 	@install -dm755 $(ROOT)
-	@install -Dm755 target/$(ARCH)-unknown-linux-gnueabihf/debug/sqlsprinkler-cli $(ROOT)/usr/bin/sqlsprinkler
+	@install -Dm755 target/arm-unknown-linux-gnueabihf/debug/sqlsprinkler-cli $(ROOT)/usr/bin/sqlsprinkler
 	@install -Dm755 conf/sqlsprinkler.conf $(ROOT)/etc/sqlsprinkler/sqlsprinkler.conf
 	@install -Dm755 systemd/sqlsprinkler-daemon.service $(ROOT)/lib/systemd/system/sqlsprinkler-daemon.service
 	@install -dm755 $(ROOT)/DEBIAN
@@ -57,19 +44,10 @@ deb:
 	@install -Dm755 conf/preinst $(ROOT)/DEBIAN/preinst
 	@install -Dm755 conf/postinst $(ROOT)/DEBIAN/postinst
 	@install -Dm755 conf/conffiles $(ROOT)/DEBIAN/conffiles
-    ifeq ($(ARCH),armv7)
-		@echo "Package: sqlsprinkler\n\
+	@echo "Package: sqlsprinkler\n\
 Version: $(VERSION)\n\
 Architecture: armhf\n\
 Maintainer: Gavin Pease <gavinpease@gmail.com>\n\
 Description: The command line and daemon for sqlsprinkler" > $(ROOT)/DEBIAN/control
-    endif
-    ifeq ($(ARCH),arm)
-		@echo "Package: sqlsprinkler\n\
-Version: $(VERSION)\n\
-Architecture: $(ARCH)\n\
-Maintainer: Gavin Pease <gavinpease@gmail.com>\n\
-Description: The command line and daemon for sqlsprinkler" > $(ROOT)/DEBIAN/control
-    endif
 	@chmod 755 -R $(ROOT)/DEBIAN
 	@dpkg-deb --build --root-owner-group $(ROOT)
