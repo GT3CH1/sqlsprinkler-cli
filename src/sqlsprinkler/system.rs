@@ -45,7 +45,7 @@ pub(crate) fn get_system_status() -> bool {
 ///     * `pool` The SQL connection pool to use to query for zones
 /// # Returns
 ///     * `Vec<Zone>` A list of all the zones in the database.
-pub fn get_zones() -> zone::ZoneList {
+pub(crate) fn get_zones() -> zone::ZoneList {
     let pool = get_pool();
     let mut conn = pool.get_conn().unwrap();
     let query = "SELECT Name, GPIO, Time, Enabled, AutoOff, SystemOrder, ID from Zones ORDER BY SystemOrder";

@@ -30,7 +30,7 @@ impl Zone {
     /// Gets the gpio interface for this zone.
     /// # Return
     ///     `gpio` An OutputPin that we can use to turn the zone on or off
-    pub fn get_gpio(&self) -> OutputPin {
+    pub(self) fn get_gpio(&self) -> OutputPin {
         let mut pin = Gpio::new().unwrap().get(self.gpio).unwrap().into_output();
         // tl;dr without this line, pins get reset immediately.
         pin.set_reset_on_drop(false);
@@ -55,8 +55,16 @@ impl Zone {
     }
 
     /// Gets the name of this zone
-    pub fn get_name(&self) -> String {
+    pub(self) fn get_name(&self) -> String {
         self.clone().name
+    }
+
+    /// Gets whether or not this zone is on
+    /// # Return
+    ///     `on` A bool representing whether or not this zone is on.
+    pub(self) fn is_on(&self) -> bool {
+        let gpio = self.get_gpio();
+        gpio.is_set_low()
     }
 
     /// Turns the zone on for 12 seconds and then turn off.
@@ -108,14 +116,6 @@ impl Zone {
             Err(..) => false
         };
         result
-    }
-
-    /// Gets whether or not this zone is on
-    /// # Return
-    ///     `on` A bool representing whether or not this zone is on.
-    pub fn is_on(&self) -> bool {
-        let gpio = self.get_gpio();
-        gpio.is_set_low()
     }
 
     /// Gets a representation of this zone, but also with `is_on` as bool `state`
