@@ -171,7 +171,7 @@ fn main() {
                     }
                     ZoneOptsArgs::Status => {
                         let zone = &my_zone;
-                        zone.get_zone_with_state().is_on();
+                        zone.get_zone_with_state().state;
                     }
                 }
             }
