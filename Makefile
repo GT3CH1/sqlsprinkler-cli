@@ -13,15 +13,12 @@ check:
     endif
 
 build:
-	@echo "Building for armv7l on" $(UNAME)
+	@echo "Building for arm on" $(UNAME)
     ifeq ($(UNAME), x86_64)
-		$(MAKE) build-armv7
+		$(MAKE) build-arm
     else
 		@cargo build
     endif
-
-build-armv7:
-	@cross build --target armv7-unknown-linux-gnueabihf
 
 build-arm:
 	@cross build --target arm-unknown-linux-gnueabihf
@@ -29,10 +26,8 @@ build-arm:
 install-service:
 	cp -v systemd/sqlsprinkler-daemon.service /etc/systemd/system
 
-install: build install-service
-	cp -v target/armv7-unknown-linux-gnueabihf/debug/sqlsprinkler-cli /usr/bin/sqlsprinkler
-	install -Dm755 conf/sqlsprinkler.conf /etc/sqlsprinkler/sqlsprinkler.conf
-
+install: build
+	dpkg -i $(ROOT).deb
 
 deb: build-arm
 	@install -dm755 $(ROOT)
