@@ -26,7 +26,7 @@ build-arm:
 install-service:
 	cp -v systemd/sqlsprinkler-daemon.service /etc/systemd/system
 
-install: build
+install: deb
 	dpkg -i $(ROOT).deb
 
 clean:

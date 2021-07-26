@@ -11,11 +11,11 @@ A command line interface for the SQLSprinkler project
     - [cross](https://github.com/rust-embedded/cross)
     - Docker
 
-After installing dependencies run `make build-rpi` to build the program.
+After installing the build dependencies, you can run `make deb` to create a `.deb` package.
 
 ## Installing
+
 * To install, please run `# make install`
-* To install the service, please run `#make install-service` (`make install` will also do this).
 
 ## Usage
 
@@ -69,7 +69,7 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
     * [x] Change zone ordering → `PUT /zone/order` → `{"order":[0,0,0]}`
 
 
-## Dependencies
+## Used libraries
 
 * rust >= 1.53.0
 * structopt 0.3.13
