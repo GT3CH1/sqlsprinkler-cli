@@ -1,2 +1,2 @@
 #!/bin/bash
-sudo systemctl restart sqlsprinkler-daemon
+sudo systemctl enable --now sqlsprinkler-daemon
