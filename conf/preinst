@@ -1,2 +1,2 @@
 #!/bin/bash
-systemctl is-active --quiet sqlsprinkler-daemon && systemctl stop sqlsprinkler-daemon
+systemctl is-active --quiet sqlsprinkler-daemon && systemctl stop sqlsprinkler-daemon || exit 0
