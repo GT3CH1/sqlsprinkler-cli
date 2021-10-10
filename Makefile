@@ -35,7 +35,7 @@ clean:
 
 deb: build-arm
 	@install -dm755 $(ROOT)
-	@install -Dm755 target/arm-unknown-linux-gnueabihf/debug/sqlsprinkler-cli $(ROOT)/usr/bin/sqlsprinkler
+	@install -Dm755 target/arm-unknown-linux-gnueabihf/release/sqlsprinkler-cli $(ROOT)/usr/bin/sqlsprinkler
 	@install -Dm755 conf/sqlsprinkler.conf $(ROOT)/etc/sqlsprinkler/sqlsprinkler.conf
 	@install -Dm755 systemd/sqlsprinkler-daemon.service $(ROOT)/lib/systemd/system/sqlsprinkler-daemon.service
 	@install -dm755 $(ROOT)/DEBIAN
