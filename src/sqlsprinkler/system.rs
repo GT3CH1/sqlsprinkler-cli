@@ -1,5 +1,6 @@
 use crate::sqlsprinkler::{get_pool, zone};
 use crate::get_settings;
+use std::{time, thread};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct SysStatus {
@@ -84,5 +85,19 @@ pub(crate) fn turn_off_all_zones() {
     let zone_list = get_zones();
     for zone_in_list in &zone_list.zones {
         zone_in_list.turn_off();
+    }
+}
+
+/// Winterizes the system by turning on a zone for a minute, followed by a three minute delay.
+pub(crate) fn winterize() {
+    let zone_list = get_zones();
+    for zone in &zone_list.zones {
+        zone.turn_on();
+        let _zone = zone.clone();
+        let run_time = time::Duration::from_secs(60);
+        thread::sleep(run_time);
+        _zone.turn_off();
+        let run_time = time::Duration::from_secs(3 * 60);
+        thread::sleep(run_time);
     }
 }

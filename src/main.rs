@@ -10,7 +10,7 @@ use structopt::StructOpt;
 
 use sqlsprinkler::daemon;
 use crate::sqlsprinkler::zone::Zone;
-use crate::sqlsprinkler::system::{get_system_status, set_system_status, turn_off_all_zones};
+use crate::sqlsprinkler::system::{get_system_status, set_system_status, turn_off_all_zones, winterize};
 
 mod sqlsprinkler;
 
@@ -212,6 +212,7 @@ fn main() {
                     SysOpts::Winterize => {
                         if get_settings().verbose {
                             println!("Winterizing the system.");
+                            winterize();
                         }
                     }
                     SysOpts::Status => {
