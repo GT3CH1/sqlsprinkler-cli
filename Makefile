@@ -17,11 +17,11 @@ build:
     ifeq ($(UNAME), x86_64)
 		$(MAKE) build-arm
     else
-		@cargo build
+		@cargo build --release
     endif
 
 build-arm:
-	@cross build --target arm-unknown-linux-gnueabihf
+	@cross build --target arm-unknown-linux-gnueabihf --release
 
 install-service:
 	cp -v systemd/sqlsprinkler-daemon.service /etc/systemd/system
