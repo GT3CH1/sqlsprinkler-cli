@@ -1,19 +1,23 @@
 // Copyright 2021 Gavin Pease
 
+mod sqlsprinkler;
+
 use std::env;
+use std::fmt::Debug;
 use std::process::exit;
 use std::str::FromStr;
 use std::sync::RwLock;
+use std::time::Duration;
+use mysql::serde_json;
 
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
+use paho_mqtt as mqtt;
 
 use sqlsprinkler::daemon;
 use crate::sqlsprinkler::zone::Zone;
-use crate::sqlsprinkler::system::{get_system_status, set_system_status, turn_off_all_zones, winterize};
-
-mod sqlsprinkler;
-
+use crate::sqlsprinkler::system::{get_system_status, get_zones, set_system_status, turn_off_all_zones, winterize};
+use crate::sqlsprinkler::mqttsprinkler;
 #[macro_use]
 extern crate lazy_static;
 
@@ -25,6 +29,18 @@ pub struct Opts {
 
     #[structopt(short = "w", long = "daemon", about = "Launches the SQLSprinkler API web daemon.")]
     daemon_mode: bool,
+
+    #[structopt(short = "h", long = "home-assistant", about = "Broadcasts the current system to home assistant.")]
+    home_assistant: bool,
+
+    #[structopt(short ="mu", long="mqtt-user", about = "The mqtt user to use")]
+    mqtt_user: String,
+
+    #[structopt(short ="mp", long="mqtt-user", about = "The mqtt user to use")]
+    mqtt_pass: String,
+
+    #[structopt(short = "mh", long="mqtt-host",about="the mqtt host to use.")]
+    mqtt_host: String,
 
     #[structopt(subcommand)]
     commands: Option<Cli>,
@@ -87,6 +103,10 @@ struct MyConfig {
     sqlsprinkler_pass: String,
     sqlsprinkler_host: String,
     sqlsprinkler_db: String,
+    mqtt_host: String,
+    mqtt_user: String,
+    mqtt_pass: String,
+    mqtt_enabled: bool,
     verbose: bool,
 }
 
@@ -96,13 +116,17 @@ lazy_static! {
 
 const SETTINGS_FILE_PATH: &str = "/etc/sqlsprinkler/sqlsprinkler.conf";
 
-impl ::std::default::Default for MyConfig {
+impl Default for MyConfig {
     fn default() -> Self {
         Self {
             sqlsprinkler_user: "".to_string(),
             sqlsprinkler_pass: "".to_string(),
             sqlsprinkler_host: "".to_string(),
             sqlsprinkler_db: "".to_string(),
+            mqtt_host: "".to_string(),
+            mqtt_user: "".to_string(),
+            mqtt_pass: "".to_string(),
+            mqtt_enabled: false,
             verbose: false,
         }
     }
@@ -115,6 +139,10 @@ impl Clone for MyConfig {
             sqlsprinkler_pass: self.sqlsprinkler_pass.clone(),
             sqlsprinkler_host: self.sqlsprinkler_host.clone(),
             sqlsprinkler_db: self.sqlsprinkler_db.clone(),
+            mqtt_host: self.mqtt_host.clone(),
+            mqtt_user: self.mqtt_user.clone(),
+            mqtt_pass: self.mqtt_pass.clone(),
+            mqtt_enabled: self.mqtt_enabled,
             verbose: self.verbose,
         }
     }
@@ -133,9 +161,11 @@ fn get_settings() -> MyConfig {
 
 fn main() {
     let cli = Opts::from_args();
+    println!("{:?}", cli);
+
     let daemon_mode = cli.daemon_mode;
     let version_mode = cli.version_mode;
-
+    let home_assistant = cli.home_assistant;
     match read_settings() {
         Ok(..) => (),
         Err(e) => {
@@ -153,6 +183,62 @@ fn main() {
         turn_off_all_zones();
         daemon::run();
     }
+    if home_assistant {
+
+        // Check if cli.mqtt_host is empty
+        let mut mqtt_host: String = String::from("");
+        let mut mqtt_user: String = String::from("");
+        let mut mqtt_pass: String = String::from("");
+
+        if cli.mqtt_host == "" {
+            mqtt_host = get_settings().mqtt_host;
+        }
+
+        if cli.mqtt_user == "" {
+            mqtt_user = get_settings().mqtt_user;
+        }
+
+        if cli.mqtt_pass == "" {
+            mqtt_pass = get_settings().mqtt_pass;
+        }
+
+        // create the mqtt client
+        let mqtt_client = mqtt::Client::new("tcp://web.peasenet.com:1883").unwrap();
+        let opts = mqtt::ConnectOptionsBuilder::new()
+            .user_name(mqtt_user)
+            .password(mqtt_pass)
+            .finalize();
+        mqtt_client.connect(opts).unwrap();
+        // connect to the broker
+        // mqtt_client.connect(mqtt_host.as_str(),1883).unwrap();
+
+        //broadcast all of the zones.
+        for zone in get_zones().zones {
+            // Broadcast the zone discovery message to the MQTT broker (as a switch)
+            let zone_topic = format!("homeassistant/switch/sqlsprinkler_zone_{}/config", zone.id);
+            let mqtt_sprinkler = mqttsprinkler::MqttSprinkler::sprinkler(zone);
+            let payload = serde_json::to_string(&mqtt_sprinkler).unwrap();
+            let msg = mqtt::Message::new(zone_topic, payload.clone(),0);
+            println!("Sending MQTT message: {:?}", payload.clone());
+            if let Err(e) = mqtt_client.publish(msg) {
+                println!("MQTT publish failed: {:?}", e);
+                exit(1);
+            }
+        }
+        // broadcast the system toggle
+        let topic = format!("homeassistant/switch/sqlsprinkler_system/config");
+        let system = mqttsprinkler::MqttSprinkler::system();
+        let payload = serde_json::to_string(&system).unwrap();
+        let msg = mqtt::Message::new(topic, payload.clone(), 0);
+        println!("Sending MQTT message: {:?}", payload.clone());
+        if let Err(e) = mqtt_client.publish(msg) {
+            println!("MQTT publish failed: {:?}", e);
+            exit(1);
+        }
+        exit(0);
+        //TODO: Send the zones enabled state, autooff state, and time.
+
+    }
     if let Some(subcommand) = cli.commands {
         let zone_list = sqlsprinkler::system::get_zones();
         match subcommand {
@@ -163,8 +249,8 @@ fn main() {
                 let my_zone: &Zone = match _zone_list.zones.get(id) {
                     Some(z) => z,
                     None => {
-                        println!("Zone id not found.");
-                        exit(-1);
+                        // Return the default zone.
+                        panic!("Zone {} not found.", id);
                     }
                 };
                 match ZoneOptsArgs::from(zone_state.state.parse().unwrap()) {
@@ -197,7 +283,7 @@ fn main() {
                         set_system_status(false);
                     }
                     SysOpts::Run => {
-                        if sqlsprinkler::system::get_system_status() {
+                        if get_system_status() {
                             if get_settings().verbose {
                                 println!("Running the system schedule.");
                             }

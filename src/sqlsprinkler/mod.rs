@@ -7,6 +7,7 @@ use crate::get_settings;
 pub mod zone;
 pub mod system;
 pub mod daemon;
+pub mod mqttsprinkler;
 
 /// Gets a connection to a MySQL database
 /// # Return

@@ -38,6 +38,7 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 * [ ] A and B days
 * [ ] Make `sqlsprinkler zone ...` call the Web API to control turning zones on and off.
 * [ ] Better error messages
+* [ ] Add support for MQTT and home assistant.
 
 ## Features added
 * [x] A configuration file at `/etc/sqlsprinkler/sqlsprinkler.conf` 
@@ -81,7 +82,7 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 * chrono 0.3.0
 * confy 0.4.0
 * lazy_static 1.4.0
-
+* paho-mqtt 0.11
 ## How-to-use
 
 * Run the program once, as `sudo`, you will get a connection error.
