@@ -1,0 +1,14 @@
+[Unit]
+Description=MQTT Listener for SQLSprinkler
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/sqlsprinkler -m
+Restart=on-failure
+RestartSec=3s
+User=pi
+Group=gpio
+
+[Install]
+WantedBy=multi-user.target

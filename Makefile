@@ -38,6 +38,7 @@ deb: build-arm
 	@install -Dm755 target/arm-unknown-linux-gnueabihf/release/sqlsprinkler-cli $(ROOT)/usr/bin/sqlsprinkler
 	@install -Dm755 conf/sqlsprinkler.conf $(ROOT)/etc/sqlsprinkler/sqlsprinkler.conf
 	@install -Dm755 systemd/sqlsprinkler-daemon.service $(ROOT)/lib/systemd/system/sqlsprinkler-daemon.service
+	@install -Dm755 systemd/sqlsprinkler-mqtt-daemon.service $(ROOT)/lib/systemd/system/sqlsprinkler-mqtt-daemon.service
 	@install -dm755 $(ROOT)/DEBIAN
 	@touch $(ROOT)/DEBIAN/control
 	@install -Dm755 conf/preinst $(ROOT)/DEBIAN/preinst
