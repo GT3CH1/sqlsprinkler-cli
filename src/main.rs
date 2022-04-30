@@ -18,6 +18,7 @@ use sqlsprinkler::daemon;
 use crate::sqlsprinkler::zone::Zone;
 use crate::sqlsprinkler::system::{get_system_status, get_zones, set_system_status, turn_off_all_zones, winterize};
 use crate::sqlsprinkler::mqttsprinkler;
+
 #[macro_use]
 extern crate lazy_static;
 
@@ -32,15 +33,6 @@ pub struct Opts {
 
     #[structopt(short = "h", long = "home-assistant", about = "Broadcasts the current system to home assistant.")]
     home_assistant: bool,
-
-    #[structopt(short ="mu", long="mqtt-user", about = "The mqtt user to use")]
-    mqtt_user: String,
-
-    #[structopt(short ="mp", long="mqtt-user", about = "The mqtt user to use")]
-    mqtt_pass: String,
-
-    #[structopt(short = "mh", long="mqtt-host",about="the mqtt host to use.")]
-    mqtt_host: String,
 
     #[structopt(subcommand)]
     commands: Option<Cli>,
@@ -189,18 +181,9 @@ fn main() {
         let mut mqtt_host: String = String::from("");
         let mut mqtt_user: String = String::from("");
         let mut mqtt_pass: String = String::from("");
-
-        if cli.mqtt_host == "" {
-            mqtt_host = get_settings().mqtt_host;
-        }
-
-        if cli.mqtt_user == "" {
-            mqtt_user = get_settings().mqtt_user;
-        }
-
-        if cli.mqtt_pass == "" {
-            mqtt_pass = get_settings().mqtt_pass;
-        }
+        mqtt_host = get_settings().mqtt_host;
+        mqtt_user = get_settings().mqtt_user;
+        mqtt_pass = get_settings().mqtt_pass;
 
         // create the mqtt client
         let mqtt_client = mqtt::Client::new("tcp://web.peasenet.com:1883").unwrap();
@@ -209,16 +192,45 @@ fn main() {
             .password(mqtt_pass)
             .finalize();
         mqtt_client.connect(opts).unwrap();
-        // connect to the broker
-        // mqtt_client.connect(mqtt_host.as_str(),1883).unwrap();
 
         //broadcast all of the zones.
         for zone in get_zones().zones {
             // Broadcast the zone discovery message to the MQTT broker (as a switch)
-            let zone_topic = format!("homeassistant/switch/sqlsprinkler_zone_{}/config", zone.id);
-            let mqtt_sprinkler = mqttsprinkler::MqttSprinkler::sprinkler(zone);
-            let payload = serde_json::to_string(&mqtt_sprinkler).unwrap();
-            let msg = mqtt::Message::new(zone_topic, payload.clone(),0);
+            let mut zone_topic = format!("homeassistant/switch/sqlsprinkler_zone_{}/config", &zone.id);
+            let mut mqtt_sprinkler = mqttsprinkler::MqttSprinkler::sprinkler(&zone);
+            let mut payload = serde_json::to_string(&mqtt_sprinkler).unwrap();
+            let mut msg = mqtt::Message::new(zone_topic, payload.clone(), 0);
+            println!("Sending MQTT message: {:?}", payload.clone());
+            if let Err(e) = mqtt_client.publish(msg) {
+                println!("MQTT publish failed: {:?}", e);
+                exit(1);
+            }
+
+            // Broadcast the zone time to the mqtt broker (as a number)
+            zone_topic = format!("homeassistant/number/sqlsprinkler_zone_{}_time/config", &zone.id);
+            mqtt_sprinkler = mqttsprinkler::MqttSprinkler::zone_time(&zone);
+            payload = serde_json::to_string(&mqtt_sprinkler).unwrap();
+            msg = mqtt::Message::new(zone_topic, payload.clone(), 0);
+            println!("Sending MQTT message: {:?}", payload.clone());
+            if let Err(e) = mqtt_client.publish(msg) {
+                println!("MQTT publish failed: {:?}", e);
+                exit(1);
+            }
+            // Broadcast the zone auto off state to the mqtt broker (as a switch)
+            zone_topic = format!("homeassistant/switch/sqlsprinkler_zone_{}_auto_off/config", &zone.id);
+            mqtt_sprinkler = mqttsprinkler::MqttSprinkler::zone_auto_off(&zone);
+            payload = serde_json::to_string(&mqtt_sprinkler).unwrap();
+            msg = mqtt::Message::new(zone_topic, payload.clone(), 0);
+            println!("Sending MQTT message: {:?}", payload.clone());
+            if let Err(e) = mqtt_client.publish(msg) {
+                println!("MQTT publish failed: {:?}", e);
+                exit(1);
+            }
+            // Broadcast the zone enabled state to the mqtt broker (as a switch)
+            zone_topic = format!("homeassistant/switch/sqlsprinkler_zone_{}_enabled/config", &zone.id);
+            mqtt_sprinkler = mqttsprinkler::MqttSprinkler::zone_enabled(&zone);
+            payload = serde_json::to_string(&mqtt_sprinkler).unwrap();
+            msg = mqtt::Message::new(zone_topic, payload.clone(), 0);
             println!("Sending MQTT message: {:?}", payload.clone());
             if let Err(e) = mqtt_client.publish(msg) {
                 println!("MQTT publish failed: {:?}", e);
@@ -235,9 +247,8 @@ fn main() {
             println!("MQTT publish failed: {:?}", e);
             exit(1);
         }
+        //TODO: Begin listening for MQTT messages
         exit(0);
-        //TODO: Send the zones enabled state, autooff state, and time.
-
     }
     if let Some(subcommand) = cli.commands {
         let zone_list = sqlsprinkler::system::get_zones();
