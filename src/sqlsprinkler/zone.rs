@@ -41,6 +41,7 @@ impl Zone {
         if get_settings().verbose {
             println!("Turned on {}", self);
         }
+        // Check if mqtt is enabled
         let mut gpio = self.get_gpio();
         gpio.set_low();
     }
@@ -236,20 +237,6 @@ pub struct ZoneList {
     pub zones: Vec<Zone>,
 }
 
-impl ::std::default::Default for Zone {
-    fn default() -> Zone {
-        Zone {
-            name: "".to_string(),
-            gpio: 0,
-            time: 0,
-            enabled: false,
-            auto_off: false,
-            system_order: 0,
-            id: 0,
-        }
-    }
-}
-
 /// Gets a zone from the given id
 /// # Params
 ///     * `zone_id` The id of the zone we want to get
@@ -318,4 +305,19 @@ pub fn add_new_zone(_zone: ZoneAdd) -> bool {
         }
     };
     result
+}
+
+/// Creates a default zone.
+impl Default for Zone {
+    fn default() -> Zone {
+        Zone {
+            name: "".to_string(),
+            gpio: 0,
+            time: 0,
+            enabled: false,
+            auto_off: false,
+            system_order: 0,
+            id: 0,
+        }
+    }
 }
