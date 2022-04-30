@@ -32,7 +32,7 @@ pub struct Opts {
     #[structopt(short = "w", long = "daemon", about = "Launches the SQLSprinkler API web daemon.")]
     daemon_mode: bool,
 
-    #[structopt(short = "h", long = "home-assistant", about = "Broadcasts the current system to home assistant.")]
+    #[structopt(short = "ha", long = "home-assistant", about = "Broadcasts the current system to home assistant.")]
     home_assistant: bool,
 
     #[structopt(subcommand)]
