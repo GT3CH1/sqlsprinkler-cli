@@ -2,23 +2,20 @@
 
 mod sqlsprinkler;
 mod mqtt;
+mod config;
 
 use std::fmt::Debug;
 use std::process::exit;
 use std::str::FromStr;
-use std::sync::RwLock;
 use mysql::serde_json;
 
-use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 
 use sqlsprinkler::daemon;
+use crate::config::{get_settings, read_settings};
 use crate::sqlsprinkler::zone::Zone;
 use crate::sqlsprinkler::system::{get_system_status, get_zones, set_system_status, turn_off_all_zones, winterize};
-use mqtt::mqttsprinkler;
 
-#[macro_use]
-extern crate lazy_static;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "sqlsprinkler", about = "SQLSprinkler")]
@@ -87,68 +84,7 @@ enum SysOpts {
     Test,
 }
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
-struct MyConfig {
-    sqlsprinkler_user: String,
-    sqlsprinkler_pass: String,
-    sqlsprinkler_host: String,
-    sqlsprinkler_db: String,
-    mqtt_host: String,
-    mqtt_user: String,
-    mqtt_pass: String,
-    mqtt_enabled: bool,
-    verbose: bool,
-}
 
-lazy_static! {
-    static ref SETTINGS: RwLock<MyConfig> = RwLock::new(MyConfig::default());
-}
-
-const SETTINGS_FILE_PATH: &str = "/etc/sqlsprinkler/sqlsprinkler.conf";
-
-
-impl Default for MyConfig {
-    fn default() -> Self {
-        Self {
-            sqlsprinkler_user: "".to_string(),
-            sqlsprinkler_pass: "".to_string(),
-            sqlsprinkler_host: "".to_string(),
-            sqlsprinkler_db: "".to_string(),
-            mqtt_host: "".to_string(),
-            mqtt_user: "".to_string(),
-            mqtt_pass: "".to_string(),
-            mqtt_enabled: false,
-            verbose: false,
-        }
-    }
-}
-
-impl Clone for MyConfig {
-    fn clone(&self) -> MyConfig {
-        MyConfig {
-            sqlsprinkler_user: self.sqlsprinkler_user.clone(),
-            sqlsprinkler_pass: self.sqlsprinkler_pass.clone(),
-            sqlsprinkler_host: self.sqlsprinkler_host.clone(),
-            sqlsprinkler_db: self.sqlsprinkler_db.clone(),
-            mqtt_host: self.mqtt_host.clone(),
-            mqtt_user: self.mqtt_user.clone(),
-            mqtt_pass: self.mqtt_pass.clone(),
-            mqtt_enabled: self.mqtt_enabled,
-            verbose: self.verbose,
-        }
-    }
-}
-
-/// Read the settings file from `/etc/sqlsprinlker/sqlsprinkler.conf` and load into memory.
-fn read_settings() -> Result<(), confy::ConfyError> {
-    let mut new_settings = SETTINGS.write().unwrap();
-    *new_settings = confy::load_path(SETTINGS_FILE_PATH)?;
-    Ok(())
-}
-
-fn get_settings() -> MyConfig {
-    SETTINGS.read().unwrap().clone()
-}
 
 fn main() {
     let cli = Opts::from_args();
