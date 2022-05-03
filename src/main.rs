@@ -171,7 +171,6 @@ fn main() {
                             }
                         }
                     }
-                    //TODO: Implement?!? Useful about once a year.
                     SysOpts::Winterize => {
                         if get_settings().verbose {
                             println!("Winterizing the system.");
