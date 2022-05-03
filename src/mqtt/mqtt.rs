@@ -1,9 +1,11 @@
 use std::thread;
 use std::time::Duration;
-use crate::{get_settings, get_system_status, get_zones, mqttsprinkler, serde_json, set_system_status, turn_off_all_zones, Zone};
+use crate::{get_settings, get_system_status, get_zones, serde_json, set_system_status, turn_off_all_zones, Zone};
 use paho_mqtt as mqtt;
 use std::sync::RwLock;
 use std::collections::HashMap;
+use lazy_static::lazy_static;
+use crate::mqtt::mqttsprinkler;
 
 
 lazy_static! {

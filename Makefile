@@ -30,8 +30,9 @@ install: deb
 	dpkg -i $(ROOT).deb
 
 clean:
-	rm *.deb
-	rm -rf ./$(ROOT)/
+	-rm *.deb
+	-rm -rf ./$(ROOT)/
+	cargo clean
 
 deb: build-arm
 	@install -dm755 $(ROOT)

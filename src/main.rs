@@ -15,7 +15,7 @@ use structopt::StructOpt;
 use sqlsprinkler::daemon;
 use crate::sqlsprinkler::zone::Zone;
 use crate::sqlsprinkler::system::{get_system_status, get_zones, set_system_status, turn_off_all_zones, winterize};
-use crate::sqlsprinkler::mqttsprinkler;
+use mqtt::mqttsprinkler;
 
 #[macro_use]
 extern crate lazy_static;
