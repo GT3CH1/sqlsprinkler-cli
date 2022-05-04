@@ -18,12 +18,15 @@ use crate::sqlsprinkler::system::{
 use crate::sqlsprinkler::zone::Zone;
 use sqlsprinkler::daemon;
 
+/// Holds the program's possible CLI options.
 #[derive(Debug, StructOpt)]
 #[structopt(name = "sqlsprinkler", about = "SQLSprinkler")]
 pub struct Opts {
+    /// Whether or not to print the version of the program
     #[structopt(short = "v", about = "Prints the version of SQLSprinkler.")]
     version_mode: bool,
 
+    /// Whether or not to run in daemon mode
     #[structopt(
         short = "w",
         long = "daemon",
@@ -31,6 +34,7 @@ pub struct Opts {
     )]
     daemon_mode: bool,
 
+    /// Whether or not to run in home assistant mode using MQTT
     #[structopt(
         short = "m",
         long = "home-assistant",
@@ -38,22 +42,30 @@ pub struct Opts {
     )]
     home_assistant: bool,
 
+    /// A list of sub commands to run
     #[structopt(subcommand)]
     commands: Option<Cli>,
 }
 
+/// The CLI subcommands.
 #[derive(Debug, StructOpt)]
 enum Cli {
     Zone(ZoneOpts),
     Sys(SysOpts),
 }
 
+/// Zone options
 #[derive(StructOpt, Debug)]
 struct ZoneOpts {
     id: u8,
     state: String,
 }
 
+/// The options for a zone.
+/// Possible subcommands are:
+/// - `on`: Turns the zone on.
+/// - `off`: Turns the zone off.
+/// - `status`: Returns the current status of the zone.
 #[derive(StructOpt, Debug)]
 enum ZoneOptsArgs {
     On,
@@ -76,6 +88,13 @@ impl FromStr for ZoneOptsArgs {
     }
 }
 
+/// The system options. Possible subcommands are:
+/// - `status`: Prints the current system status.
+/// - `on`: Enables the system.
+/// - `off`: Disables the system.
+/// - `winterize`: Runs a winterization feature.
+/// - `test`: Tests the system, so the user can check functionality.
+/// - `run`: Runs the system as it is configured.
 #[derive(StructOpt, Debug)]
 enum SysOpts {
     /// Enables the system schedule
@@ -92,6 +111,7 @@ enum SysOpts {
     Test,
 }
 
+/// Main entry point for the SQLSprinkler program.
 fn main() {
     let cli = Opts::from_args();
     println!("{:?}", cli);
