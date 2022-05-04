@@ -79,7 +79,7 @@ pub fn mqtt_run() -> ! {
         for zone in get_zones().zones {
             // send current status
             let mut topic = format!("sqlsprinkler_zone_{}/status", zone.id);
-            let mut payload = format!("{}", if zone.get_zone_with_state().state { "ON" } else { "OFF" });
+            let mut payload = format!("{}", if zone.get_with_state().state { "ON" } else { "OFF" });
             let mut msg = mqtt::Message::new(topic, payload, 0);
             mqtt_client.publish(msg);
 
@@ -133,7 +133,7 @@ fn check_msg_enabled_state(topic: &str, payload_str: &Cow<str>, zone: (&String, 
         let enabled_state = payload_str.parse::<bool>().unwrap();
         let mut new_zone = zone.1.clone();
         new_zone.enabled = enabled_state;
-        zone.1.update_zone(new_zone);
+        zone.1.update(new_zone);
     }
 }
 
@@ -143,7 +143,7 @@ fn check_msg_autooff(topic: &str, payload_str: &Cow<str>, zone: (&String, &Zone)
         let auto_off_state = payload_str.parse::<bool>().unwrap();
         let mut new_zone = zone.1.clone();
         new_zone.auto_off = auto_off_state;
-        zone.1.update_zone(new_zone);
+        zone.1.update(new_zone);
     }
 }
 
@@ -153,7 +153,7 @@ fn check_msg_time(topic: &str, payload_str: &Cow<str>, zone: (&String, &Zone)) {
         let time = payload_str.parse::<u64>().unwrap();
         let mut new_zone = zone.1.clone();
         new_zone.time = time;
-        zone.1.update_zone(new_zone);
+        zone.1.update(new_zone);
     }
 }
 

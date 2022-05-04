@@ -75,7 +75,7 @@ pub fn run() {
     for zone in &zone_list.zones {
         // Skip over zones that aren't enabled in the database.
         if zone.enabled {
-            zone.run_zone();
+            zone.run();
         }
     }
 }
