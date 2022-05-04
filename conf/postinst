@@ -1,2 +1,3 @@
 #!/bin/bash
 sudo systemctl enable --now sqlsprinkler-daemon
+sudo systemctl enable --now sqlsprinkler-mqtt-daemon

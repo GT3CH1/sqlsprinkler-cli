@@ -1,2 +1,3 @@
 #!/bin/bash
 systemctl is-active --quiet sqlsprinkler-daemon && systemctl stop sqlsprinkler-daemon || exit 0
+systemctl is-active --quiet sqlsprinkler-mqtt-daemon && systemctl stop sqlsprinkler-mqtt-daemon || exit 0
