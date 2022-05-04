@@ -18,7 +18,7 @@ impl MqttSprinkler {
     /// Creates a new MqttSprinkler
     pub fn sprinkler(sprinkler_zone: &Zone) -> MqttSprinkler {
         MqttSprinkler {
-            name: format!("sqlsprinkler_zone_{}",sprinkler_zone.name),
+            name: format!("sqlsprinkler_zone_{}", sprinkler_zone.name),
             // Status topic should be in the format of sqlsprinkler/zone_id/status
             stat_t: format!("sqlsprinkler_zone_{}/status", sprinkler_zone.id),
             // Command topic should be in the frmat of sqlsprinkler/zone_id/command
@@ -41,7 +41,7 @@ impl MqttSprinkler {
 
     pub fn zone_time(zone: &Zone) -> MqttSprinkler {
         MqttSprinkler {
-            name: format!("sqlsprinkler_zone_{}_time",zone.name),
+            name: format!("sqlsprinkler_zone_{}_time", zone.name),
             stat_t: format!("sqlsprinkler_zone_{}_time/status", zone.id),
             cmd_t: format!("sqlsprinkler_zone_{}_time/command", zone.id),
             uniq_id: format!("sqlsprinkler_zone_{}_time", zone.id),
@@ -51,7 +51,7 @@ impl MqttSprinkler {
 
     pub fn zone_auto_off(zone: &Zone) -> MqttSprinkler {
         MqttSprinkler {
-            name: format!("sqlsprinkler_zone_{}_auto_off_state",zone.name),
+            name: format!("sqlsprinkler_zone_{}_auto_off_state", zone.name),
             stat_t: format!("sqlsprinkler_zone_{}_auto_off_state/status", zone.id),
             cmd_t: format!("sqlsprinkler_zone_{}_auto_off_state/command", zone.id),
             uniq_id: format!("sqlsprinkler_zone_{}_auto_off_state", zone.id),
@@ -61,7 +61,7 @@ impl MqttSprinkler {
 
     pub fn zone_enabled(zone: &Zone) -> MqttSprinkler {
         MqttSprinkler {
-            name: format!("sqlsprinkler_zone_{}_enabled_state",zone.name),
+            name: format!("sqlsprinkler_zone_{}_enabled_state", zone.name),
             stat_t: format!("sqlsprinkler_zone_{}_enabled_state/status", zone.id),
             cmd_t: format!("sqlsprinkler_zone_{}_enabled_state/command", zone.id),
             uniq_id: format!("sqlsprinkler_zone_{}_enabled_state", zone.id),

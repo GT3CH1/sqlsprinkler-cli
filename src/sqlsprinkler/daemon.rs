@@ -1,8 +1,8 @@
-use crate::{get_system_status, set_system_status, turn_off_all_zones, sqlsprinkler};
-use warp::{Filter, http, reject};
-use serde::{Serialize, Deserialize};
-use crate::sqlsprinkler::{zone, zone::get_zone_from_id, system};
 use crate::sqlsprinkler::zone::ZoneOrder;
+use crate::sqlsprinkler::{system, zone, zone::get_zone_from_id};
+use crate::{get_system_status, set_system_status, sqlsprinkler, turn_off_all_zones};
+use serde::{Deserialize, Serialize};
+use warp::{http, reject, Filter};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct SysStatus {
@@ -83,54 +83,47 @@ pub(crate) async fn run() {
         .or(delete_zone)
         .or(update_zone)
         .or(update_order);
-    warp::serve(routes)
-        .run(([0, 0, 0, 0], 3030))
-        .await;
+    warp::serve(routes).run(([0, 0, 0, 0], 3030)).await;
 }
 
 /// Used to filter a put request to change the system status
-fn sys_status_put_json() -> impl Filter<Extract=(SysStatus, ), Error=warp::Rejection> + Clone {
-    warp::body::content_length_limit(1024 * 16)
-        .and(warp::body::json())
+fn sys_status_put_json() -> impl Filter<Extract = (SysStatus,), Error = warp::Rejection> + Clone {
+    warp::body::content_length_limit(1024 * 16).and(warp::body::json())
 }
 
 /// Used to filter a put request to toggle a specific zone.
-fn zone_status_put_json() -> impl Filter<Extract=(sqlsprinkler::zone::ZoneToggle, ), Error=warp::Rejection> + Clone {
-    warp::body::content_length_limit(1024 * 16)
-        .and(warp::body::json())
+fn zone_status_put_json(
+) -> impl Filter<Extract = (sqlsprinkler::zone::ZoneToggle,), Error = warp::Rejection> + Clone {
+    warp::body::content_length_limit(1024 * 16).and(warp::body::json())
 }
 
 /// Used to filter a post request to add a new zone.
-fn zone_post_json() -> impl Filter<Extract=(zone::ZoneAdd, ), Error=warp::Rejection> + Clone {
-    warp::body::content_length_limit(1024 * 16)
-        .and(warp::body::json())
+fn zone_post_json() -> impl Filter<Extract = (zone::ZoneAdd,), Error = warp::Rejection> + Clone {
+    warp::body::content_length_limit(1024 * 16).and(warp::body::json())
 }
 
 /// Used to filter a delete request to delete a new zone.
-fn zone_delete_json() -> impl Filter<Extract=(zone::ZoneDelete, ), Error=warp::Rejection> + Clone {
-    warp::body::content_length_limit(1024 * 16)
-        .and(warp::body::json())
+fn zone_delete_json() -> impl Filter<Extract = (zone::ZoneDelete,), Error = warp::Rejection> + Clone
+{
+    warp::body::content_length_limit(1024 * 16).and(warp::body::json())
 }
 
 /// Used to filter a put request to update a zone.
-fn zone_json() -> impl Filter<Extract=(zone::Zone, ), Error=warp::Rejection> + Clone {
-    warp::body::content_length_limit(1024 * 16)
-        .and(warp::body::json())
+fn zone_json() -> impl Filter<Extract = (zone::Zone,), Error = warp::Rejection> + Clone {
+    warp::body::content_length_limit(1024 * 16).and(warp::body::json())
 }
 
 /// Used to filter a put request to re-order the system
-fn order_json() -> impl Filter<Extract=(ZoneOrder, ), Error=warp::Rejection> + Clone {
-    warp::body::content_length_limit(1024 * 16)
-        .and(warp::body::json())
+fn order_json() -> impl Filter<Extract = (ZoneOrder,), Error = warp::Rejection> + Clone {
+    warp::body::content_length_limit(1024 * 16).and(warp::body::json())
 }
-
 
 /// Gets the system status
 /// # Returns
 ///     * `json` A json object representing the current state of the system schedule.
 async fn get_sys_status() -> Result<impl warp::Reply, warp::Rejection> {
     let value = SysStatus {
-        system_enabled: get_system_status()
+        system_enabled: get_system_status(),
     };
     Ok(warp::reply::json(&value))
 }
@@ -181,7 +174,10 @@ async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, wa
 ///     * `_zone` The new zone we are wanting to add to the system.
 async fn _add_zone(_zone: zone::ZoneAdd) -> Result<impl warp::Reply, warp::Rejection> {
     zone::add_new_zone(_zone);
-    Ok(warp::reply::with_status("Adding zone", http::StatusCode::CREATED))
+    Ok(warp::reply::with_status(
+        "Adding zone",
+        http::StatusCode::CREATED,
+    ))
 }
 
 /// Deletes a zone
@@ -189,7 +185,10 @@ async fn _add_zone(_zone: zone::ZoneAdd) -> Result<impl warp::Reply, warp::Rejec
 ///     * `_zone` The zone we are wanting to delete.
 async fn _delete_zone(_zone: zone::ZoneDelete) -> Result<impl warp::Reply, warp::Rejection> {
     zone::delete_zone(_zone);
-    Ok(warp::reply::with_status("Deleted zone", http::StatusCode::OK))
+    Ok(warp::reply::with_status(
+        "Deleted zone",
+        http::StatusCode::OK,
+    ))
 }
 
 /// Updates a zone
@@ -198,7 +197,10 @@ async fn _delete_zone(_zone: zone::ZoneDelete) -> Result<impl warp::Reply, warp:
 async fn _update_zone(_zone: zone::Zone) -> Result<impl warp::Reply, warp::Rejection> {
     let zone = zone::get_zone_from_id(_zone.id);
     zone.update(_zone);
-    Ok(warp::reply::with_status("Updated zone", http::StatusCode::OK))
+    Ok(warp::reply::with_status(
+        "Updated zone",
+        http::StatusCode::OK,
+    ))
 }
 
 /// Updates the order of all zones in the system

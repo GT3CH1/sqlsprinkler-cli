@@ -1,13 +1,12 @@
 use lazy_static::lazy_static;
-use std::sync::RwLock;
 use serde::{Deserialize, Serialize};
+use std::sync::RwLock;
 
 const SETTINGS_FILE_PATH: &str = "/etc/sqlsprinkler/sqlsprinkler.conf";
 
 lazy_static! {
     static ref SETTINGS: RwLock<MyConfig> = RwLock::new(MyConfig::default());
 }
-
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct MyConfig {
@@ -57,7 +56,6 @@ impl Clone for MyConfig {
 pub fn get_settings() -> MyConfig {
     SETTINGS.read().unwrap().clone()
 }
-
 
 /// Read the settings file from `/etc/sqlsprinlker/sqlsprinkler.conf` and load into memory.
 pub fn read_settings() -> Result<(), confy::ConfyError> {

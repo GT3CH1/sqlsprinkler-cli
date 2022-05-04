@@ -1,21 +1,22 @@
 // Copyright 2021 Gavin Pease
 
-mod sqlsprinkler;
-mod mqtt;
 mod config;
+mod mqtt;
+mod sqlsprinkler;
 
+use mysql::serde_json;
 use std::fmt::Debug;
 use std::process::exit;
 use std::str::FromStr;
-use mysql::serde_json;
 
 use structopt::StructOpt;
 
-use sqlsprinkler::daemon;
 use crate::config::{get_settings, read_settings};
+use crate::sqlsprinkler::system::{
+    get_system_status, get_zones, set_system_status, turn_off_all_zones, winterize,
+};
 use crate::sqlsprinkler::zone::Zone;
-use crate::sqlsprinkler::system::{get_system_status, get_zones, set_system_status, turn_off_all_zones, winterize};
-
+use sqlsprinkler::daemon;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "sqlsprinkler", about = "SQLSprinkler")]
@@ -23,10 +24,18 @@ pub struct Opts {
     #[structopt(short = "v", about = "Prints the version of SQLSprinkler.")]
     version_mode: bool,
 
-    #[structopt(short = "w", long = "daemon", about = "Launches the SQLSprinkler API web daemon.")]
+    #[structopt(
+        short = "w",
+        long = "daemon",
+        about = "Launches the SQLSprinkler API web daemon."
+    )]
     daemon_mode: bool,
 
-    #[structopt(short = "m", long = "home-assistant", about = "Broadcasts the current system to home assistant.")]
+    #[structopt(
+        short = "m",
+        long = "home-assistant",
+        about = "Broadcasts the current system to home assistant."
+    )]
     home_assistant: bool,
 
     #[structopt(subcommand)]
@@ -67,7 +76,6 @@ impl FromStr for ZoneOptsArgs {
     }
 }
 
-
 #[derive(StructOpt, Debug)]
 enum SysOpts {
     /// Enables the system schedule
@@ -83,7 +91,6 @@ enum SysOpts {
     /// Tests the system.
     Test,
 }
-
 
 fn main() {
     let cli = Opts::from_args();
@@ -112,7 +119,7 @@ fn main() {
     }
 
     if home_assistant {
-        mqtt::mqtt::mqtt_run();
+        mqtt::mqtt_client::mqtt_run();
     }
 
     if let Some(subcommand) = cli.commands {
@@ -139,58 +146,62 @@ fn main() {
                     }
                     ZoneOptsArgs::Status => {
                         let zone = &my_zone;
-                        zone.get_with_state().state;
-                        println!("The zone is {}", if zone.get_with_state().state { "on" } else { "off" });
+                        println!(
+                            "The zone is {}",
+                            if zone.get_with_state().state {
+                                "on"
+                            } else {
+                                "off"
+                            }
+                        );
                     }
                 }
             }
             // `sqlsprinkler sys ...`
-            Cli::Sys(sys_opts) => {
-                match sys_opts {
-                    SysOpts::On => {
+            Cli::Sys(sys_opts) => match sys_opts {
+                SysOpts::On => {
+                    if get_settings().verbose {
+                        println!("Enabled system schedule");
+                    }
+                    set_system_status(true);
+                }
+                SysOpts::Off => {
+                    if get_settings().verbose {
+                        println!("Disabling system schedule.");
+                    }
+                    set_system_status(false);
+                }
+                SysOpts::Run => {
+                    if get_system_status() {
                         if get_settings().verbose {
-                            println!("Enabled system schedule");
+                            println!("Running the system schedule.");
                         }
-                        set_system_status(true);
-                    }
-                    SysOpts::Off => {
-                        if get_settings().verbose {
-                            println!("Disabling system schedule.");
-                        }
-                        set_system_status(false);
-                    }
-                    SysOpts::Run => {
-                        if get_system_status() {
-                            if get_settings().verbose {
-                                println!("Running the system schedule.");
-                            }
-                            sqlsprinkler::system::run();
-                        } else if get_settings().verbose {
-                            println!("System is not enabled, refusing.");
-                        }
-                    }
-                    SysOpts::Winterize => {
-                        if get_settings().verbose {
-                            println!("Winterizing the system.");
-                            winterize();
-                        }
-                    }
-                    SysOpts::Status => {
-                        let system_status = get_system_status();
-                        let output = match system_status {
-                            true => "enabled",
-                            false => "disabled",
-                        };
-                        println!("The system is {}", output);
-                    }
-                    SysOpts::Test => {
-                        turn_off_all_zones();
-                        for zone in zone_list.zones {
-                            zone.test();
-                        }
+                        sqlsprinkler::system::run();
+                    } else if get_settings().verbose {
+                        println!("System is not enabled, refusing.");
                     }
                 }
-            }
+                SysOpts::Winterize => {
+                    if get_settings().verbose {
+                        println!("Winterizing the system.");
+                        winterize();
+                    }
+                }
+                SysOpts::Status => {
+                    let system_status = get_system_status();
+                    let output = match system_status {
+                        true => "enabled",
+                        false => "disabled",
+                    };
+                    println!("The system is {}", output);
+                }
+                SysOpts::Test => {
+                    turn_off_all_zones();
+                    for zone in zone_list.zones {
+                        zone.test();
+                    }
+                }
+            },
         }
     }
 }

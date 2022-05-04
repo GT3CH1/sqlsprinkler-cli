@@ -1,6 +1,6 @@
-use crate::sqlsprinkler::{get_pool, zone};
 use crate::get_settings;
-use std::{time, thread};
+use crate::sqlsprinkler::{get_pool, zone};
+use std::{thread, time};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct SysStatus {
@@ -18,7 +18,6 @@ pub fn set_system_status(enabled: bool) {
     pool.prep_exec(query, (enabled,)).unwrap();
 }
 
-
 /// Gets whether the system schedule is enabled or disabled
 /// # Arguments
 ///     * `pool` The SQL connection pool used to toggle the system.
@@ -27,16 +26,18 @@ pub fn set_system_status(enabled: bool) {
 pub(crate) fn get_system_status() -> bool {
     let pool = get_pool();
     let query = "SELECT enabled FROM Enabled";
-    let sys_status: Vec<SysStatus> =
-        pool.prep_exec(query, ())
-            .map(|result| {
-                result.map(|x| x.unwrap()).map(|row| {
+    let sys_status: Vec<SysStatus> = pool
+        .prep_exec(query, ())
+        .map(|result| {
+            result
+                .map(|x| x.unwrap())
+                .map(|row| {
                     let status = mysql::from_row(row);
-                    SysStatus {
-                        status
-                    }
-                }).collect()
-            }).unwrap();
+                    SysStatus { status }
+                })
+                .collect()
+        })
+        .unwrap();
     sys_status[0].status
 }
 
@@ -49,9 +50,7 @@ pub(crate) fn get_zones() -> zone::ZoneList {
     let pool = get_pool();
     let mut conn = pool.get_conn().unwrap();
     let query = "SELECT Name, GPIO, Time, Enabled, AutoOff, SystemOrder, ID from Zones ORDER BY SystemOrder";
-    let rows = conn
-        .query(query)
-        .unwrap();
+    let rows = conn.query(query).unwrap();
     if get_settings().verbose {
         println!("{}", query);
     }
@@ -61,11 +60,8 @@ pub(crate) fn get_zones() -> zone::ZoneList {
         let zone = zone::Zone::from(_row);
         zone_list.push(zone);
     }
-    zone::ZoneList {
-        zones: zone_list
-    }
+    zone::ZoneList { zones: zone_list }
 }
-
 
 /// Runs the system based on the schedule configured. Skips over any zones that are not enabled in the database.
 pub fn run() {

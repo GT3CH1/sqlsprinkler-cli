@@ -1,10 +1,10 @@
-use serde::{Serialize, Deserialize};
-use std::convert::From;
-use std::{thread, time, fmt};
-use rppal::gpio::{Gpio, OutputPin};
-use mysql::{params, Row};
-use crate::sqlsprinkler::get_pool;
 use crate::get_settings;
+use crate::sqlsprinkler::get_pool;
+use mysql::{params, Row};
+use rppal::gpio::{Gpio, OutputPin};
+use serde::{Deserialize, Serialize};
+use std::convert::From;
+use std::{fmt, thread, time};
 
 /// Represents a SQLSprinkler zone.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -111,20 +111,23 @@ impl Zone {
     pub fn update(&self, zone: Zone) -> bool {
         let query = get_pool().prepare("UPDATE Zones SET Name=:name, Gpio=:gpio, Time=:time, AutoOff=:autooff,Enabled=:enabled,SystemOrder=:so WHERE ID=:id").into_iter();
         let mut updated: bool = false;
-        for mut stmt in query.into_iter() {
-            updated = stmt.execute(params! {
-                "name" => &zone.name,
-                "gpio" => zone.gpio,
-                "time" => zone.time,
-                "autooff" => zone.auto_off,
-                "enabled" => zone.enabled,
-                "so" => zone.system_order,
-                "id" => self.id
-            }).unwrap().affected_rows() == 1;
+        for mut stmt in query {
+            updated = stmt
+                .execute(params! {
+                    "name" => &zone.name,
+                    "gpio" => zone.gpio,
+                    "time" => zone.time,
+                    "autooff" => zone.auto_off,
+                    "enabled" => zone.enabled,
+                    "so" => zone.system_order,
+                    "id" => self.id
+                })
+                .unwrap()
+                .affected_rows()
+                == 1;
         }
         updated
     }
-
 
     /// Gets a representation of this zone, but also with `is_on` as bool `state`
     /// # Return
@@ -169,7 +172,17 @@ impl Clone for Zone {
 
 impl fmt::Display for Zone {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} | {} | {} | {} | {} | {} | {}", self.name, self.gpio, self.time, self.enabled, self.auto_off, self.system_order, self.id)
+        write!(
+            f,
+            "{} | {} | {} | {} | {} | {} | {}",
+            self.name,
+            self.gpio,
+            self.time,
+            self.enabled,
+            self.auto_off,
+            self.system_order,
+            self.id
+        )
     }
 }
 
@@ -252,7 +265,11 @@ pub struct ZoneList {
 ///     * `Zone` The zone that corresponds to the given id.
 pub fn get_zone_from_id(zone_id: i8) -> Zone {
     let mut pool = get_pool().get_conn().unwrap();
-    let mut stmt = pool.prepare("SELECT Name, Gpio, Time, Enabled, AutoOff, SystemOrder, ID from Zones WHERE ID = :zi").unwrap();
+    let mut stmt = pool
+        .prepare(
+            "SELECT Name, Gpio, Time, Enabled, AutoOff, SystemOrder, ID from Zones WHERE ID = :zi",
+        )
+        .unwrap();
     let mut _zone = Zone::default();
 
     let mut rows = stmt.execute(params! {"zi" => zone_id}).unwrap();
@@ -283,7 +300,7 @@ pub fn delete_zone(_zone: ZoneDelete) -> bool {
     if get_settings().verbose {
         println!("{}", query);
     }
-    let result = match pool.prep_exec(query, (_zone.id, )) {
+    let result = match pool.prep_exec(query, (_zone.id,)) {
         Ok(..) => true,
         Err(..) => {
             if get_settings().verbose {
@@ -303,12 +320,22 @@ pub fn delete_zone(_zone: ZoneDelete) -> bool {
 ///     * A bool representing whether or not the insert was successful (true) or failed (false)
 pub fn add_new_zone(_zone: ZoneAdd) -> bool {
     let pool = get_pool();
-    let query = "INSERT into `Zones` (`Name`, `Gpio`, `Time`, `AutoOff`, `Enabled`) VALUES ( ?,?,?,?,? )";
+    let query =
+        "INSERT into `Zones` (`Name`, `Gpio`, `Time`, `AutoOff`, `Enabled`) VALUES ( ?,?,?,?,? )";
 
     if get_settings().verbose {
         println!("{}", query);
     }
-    let result = match pool.prep_exec(query, (_zone.name, _zone.gpio, _zone.time, _zone.auto_off, _zone.enabled, )) {
+    let result = match pool.prep_exec(
+        query,
+        (
+            _zone.name,
+            _zone.gpio,
+            _zone.time,
+            _zone.auto_off,
+            _zone.enabled,
+        ),
+    ) {
         Ok(..) => true,
         Err(e) => {
             if get_settings().verbose {

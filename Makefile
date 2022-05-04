@@ -7,10 +7,14 @@ default:
 check:
 	@echo "Checking for armv7l on" $(UNAME)
     ifeq ($(UNAME), x86_64)
-	    @cross check --target armv7-unknown-linux-gnueabihf
+	    @cross clippy --target armv7-unknown-linux-gnueabihf
     else
-		cargo check
+		cargo clippy
     endif
+
+fmt:
+	@echo "Formatting"
+	cargo fmt
 
 build:
 	@echo "Building for arm on" $(UNAME)

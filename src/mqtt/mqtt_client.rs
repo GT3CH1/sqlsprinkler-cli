@@ -1,13 +1,15 @@
+use crate::mqtt::mqttsprinkler;
+use crate::{
+    get_settings, get_system_status, get_zones, serde_json, set_system_status, turn_off_all_zones,
+    Zone,
+};
+use lazy_static::lazy_static;
+use paho_mqtt as mqtt;
 use std::borrow::Cow;
+use std::collections::HashMap;
+use std::sync::RwLock;
 use std::thread;
 use std::time::Duration;
-use crate::{get_settings, get_system_status, get_zones, serde_json, set_system_status, turn_off_all_zones, Zone};
-use paho_mqtt as mqtt;
-use std::sync::RwLock;
-use std::collections::HashMap;
-use lazy_static::lazy_static;
-use crate::mqtt::mqttsprinkler;
-
 
 lazy_static! {
     // create a hashmap of topics and zone
@@ -42,7 +44,6 @@ pub fn mqtt_run() -> ! {
         .finalize();
 
     mqtt_client.connect_with_callbacks(opts, on_connect_success, on_connect_failure);
-
 
     // Set a closure to be called whenever the client connection is established.
     mqtt_client.set_connected_callback(|_cli: &mqtt::AsyncClient| {
@@ -79,7 +80,11 @@ pub fn mqtt_run() -> ! {
         for zone in get_zones().zones {
             // send current status
             let mut topic = format!("sqlsprinkler_zone_{}/status", zone.id);
-            let mut payload = if zone.get_with_state().state { "ON" } else { "OFF" };
+            let mut payload = if zone.get_with_state().state {
+                "ON"
+            } else {
+                "OFF"
+            };
             let mut msg = mqtt::Message::new(topic, payload, 0);
             mqtt_client.publish(msg);
 
@@ -99,7 +104,7 @@ pub fn mqtt_run() -> ! {
 
             // send current enabled state
             topic = format!("sqlsprinkler_zone_{}_enabled_state/status", zone.id);
-            payload =  if zone.enabled { "ON" } else { "OFF" } ;
+            payload = if zone.enabled { "ON" } else { "OFF" };
             msg = mqtt::Message::new(topic, payload, 0);
             mqtt_client.publish(msg);
         }
@@ -119,7 +124,7 @@ fn check_system_command_topic(topic: &str, payload_str: Cow<str>) {
 }
 
 /// Checks if the given topic matches the zone topic, zone time topic, zone auto off topic, or zone enabled topic
-fn check_msg_topic(topic: &str, payload_str: &Cow<str>, zone: (&String, &Zone)) {
+fn check_msg_topic(topic: &str, payload_str: &str, zone: (&String, &Zone)) {
     check_msg_zone(topic, payload_str, zone);
     // check if the payload matches sqlsprinkler_zone_<zone_id>_time
     check_msg_time(topic, payload_str, zone);
@@ -130,7 +135,7 @@ fn check_msg_topic(topic: &str, payload_str: &Cow<str>, zone: (&String, &Zone)) 
 }
 
 /// Checks if the given topic matches the zone enabled topic - sqlsprinkler_zone_<zone_id>_enabled_state/command
-fn check_msg_enabled_state(topic: &str, payload_str: &Cow<str>, zone: (&String, &Zone)) {
+fn check_msg_enabled_state(topic: &str, payload_str: &str, zone: (&String, &Zone)) {
     if topic == format!("sqlsprinkler_zone_{}_enabled_state/command", zone.1.id) {
         let enabled_state = payload_str.parse::<bool>().unwrap();
         let mut new_zone = zone.1.clone();
@@ -140,7 +145,7 @@ fn check_msg_enabled_state(topic: &str, payload_str: &Cow<str>, zone: (&String, 
 }
 
 /// Checks if the given topic matches the zone auto off topic - sqlsprinkler_zone_<zone_id>_auto_off_state/command
-fn check_msg_autooff(topic: &str, payload_str: &Cow<str>, zone: (&String, &Zone)) {
+fn check_msg_autooff(topic: &str, payload_str: &str, zone: (&String, &Zone)) {
     if topic == format!("sqlsprinkler_zone_{}_auto_off_state/command", zone.1.id) {
         let auto_off_state = payload_str.parse::<bool>().unwrap();
         let mut new_zone = zone.1.clone();
@@ -150,7 +155,7 @@ fn check_msg_autooff(topic: &str, payload_str: &Cow<str>, zone: (&String, &Zone)
 }
 
 /// Checks if the given topic matches the zone time topic - sqlsprinkler_zone_<zone_id>_time/command
-fn check_msg_time(topic: &str, payload_str: &Cow<str>, zone: (&String, &Zone)) {
+fn check_msg_time(topic: &str, payload_str: &str, zone: (&String, &Zone)) {
     if topic == format!("sqlsprinkler_zone_{}_time/command", zone.1.id) {
         let time = payload_str.parse::<u64>().unwrap();
         let mut new_zone = zone.1.clone();
@@ -160,15 +165,14 @@ fn check_msg_time(topic: &str, payload_str: &Cow<str>, zone: (&String, &Zone)) {
 }
 
 /// Checks if the given topic matches the zone topic - sqlsprinkler_zone_<zone_id>/command
-fn check_msg_zone(topic: &str, payload_str: &Cow<str>, zone: (&String, &Zone)) {
+fn check_msg_zone(topic: &str, payload_str: &str, zone: (&String, &Zone)) {
     if topic == format!("sqlsprinkler_zone_{}/command", zone.1.id) {
         turn_off_all_zones();
-        if payload_str.clone() == "ON" {
+        if payload_str == "ON" {
             zone.1.turn_on();
         }
     }
 }
-
 
 fn on_connect_success(cli: &mqtt::AsyncClient, _msgid: u16) {
     println!("Connection succeeded");
@@ -182,38 +186,59 @@ fn on_connect_success(cli: &mqtt::AsyncClient, _msgid: u16) {
         let mut msg = mqtt::Message::new(zone_topic.clone(), payload.clone(), 0);
         println!("Sending MQTT message: {}", payload.clone());
         cli.publish(msg);
-        ZONES.write().unwrap().insert(mqtt_sprinkler.cmd_t, zone.clone());
+        ZONES
+            .write()
+            .unwrap()
+            .insert(mqtt_sprinkler.cmd_t, zone.clone());
 
         // Broadcast the zone time to the mqtt broker (as a number)
-        zone_topic = format!("homeassistant/number/sqlsprinkler_zone_{}_time/config", &zone.id);
+        zone_topic = format!(
+            "homeassistant/number/sqlsprinkler_zone_{}_time/config",
+            &zone.id
+        );
         mqtt_sprinkler = mqttsprinkler::MqttSprinkler::zone_time(&zone);
         payload = serde_json::to_string(&mqtt_sprinkler).unwrap();
         msg = mqtt::Message::new(zone_topic.clone(), payload.clone(), 0);
         println!("Sending MQTT message: {}", payload.clone());
         cli.publish(msg);
-        ZONES.write().unwrap().insert(mqtt_sprinkler.cmd_t, zone.clone());
+        ZONES
+            .write()
+            .unwrap()
+            .insert(mqtt_sprinkler.cmd_t, zone.clone());
 
         // Broadcast the zone auto off state to the mqtt broker (as a switch)
-        zone_topic = format!("homeassistant/switch/sqlsprinkler_zone_{}_auto_off/config", &zone.id);
+        zone_topic = format!(
+            "homeassistant/switch/sqlsprinkler_zone_{}_auto_off/config",
+            &zone.id
+        );
         mqtt_sprinkler = mqttsprinkler::MqttSprinkler::zone_auto_off(&zone);
         payload = serde_json::to_string(&mqtt_sprinkler).unwrap();
         msg = mqtt::Message::new(zone_topic.clone(), payload.clone(), 0);
         println!("Sending MQTT message: {}", payload.clone());
         cli.publish(msg);
-        ZONES.write().unwrap().insert(mqtt_sprinkler.cmd_t, zone.clone());
+        ZONES
+            .write()
+            .unwrap()
+            .insert(mqtt_sprinkler.cmd_t, zone.clone());
 
         // Broadcast the zone enabled state to the mqtt broker (as a switch)
-        zone_topic = format!("homeassistant/switch/sqlsprinkler_zone_{}_enabled/config", &zone.id);
+        zone_topic = format!(
+            "homeassistant/switch/sqlsprinkler_zone_{}_enabled/config",
+            &zone.id
+        );
         mqtt_sprinkler = mqttsprinkler::MqttSprinkler::zone_enabled(&zone);
         payload = serde_json::to_string(&mqtt_sprinkler).unwrap();
         msg = mqtt::Message::new(zone_topic.clone(), payload.clone(), 0);
         println!("Sending MQTT message: {}", payload.clone());
         cli.publish(msg);
-        ZONES.write().unwrap().insert(mqtt_sprinkler.cmd_t, zone.clone());
+        ZONES
+            .write()
+            .unwrap()
+            .insert(mqtt_sprinkler.cmd_t, zone.clone());
     }
 
     // broadcast the system toggle
-    let topic = format!("homeassistant/switch/sqlsprinkler_system/config");
+    let topic = "homeassistant/switch/sqlsprinkler_system/config";
     let system = mqttsprinkler::MqttSprinkler::system();
     let payload = serde_json::to_string(&system).unwrap();
     let msg = mqtt::Message::new(topic, payload.clone(), 0);
