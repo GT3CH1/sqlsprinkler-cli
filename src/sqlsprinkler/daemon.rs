@@ -15,6 +15,7 @@ struct LengthMismatch;
 impl reject::Reject for LengthMismatch {}
 
 #[tokio::main]
+/// Main function for the daemon.
 pub(crate) async fn run() {
     // Handle get requests to /system/state -> Used to get the current state of the sys schedule
     let get_sys_status = warp::get()
@@ -149,6 +150,8 @@ async fn get_zone_status() -> Result<impl warp::Reply, warp::Rejection> {
 }
 
 /// Sets the id of the zone to the given state -> IE, turning on a zone.
+/// # Params
+///    * `_zone` The ZoneToggle object containing the id of the zone we are going to toggle and the state we are going to set it to.
 async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, warp::Rejection> {
     let state = _zone.state;
     let zone = get_zone_from_id(_zone.id);
