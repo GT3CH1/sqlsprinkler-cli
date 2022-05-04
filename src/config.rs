@@ -8,16 +8,34 @@ lazy_static! {
     static ref SETTINGS: RwLock<MyConfig> = RwLock::new(MyConfig::default());
 }
 
+/// Configuration for the application
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct MyConfig {
+    /// The user to connect to the database as
     pub sqlsprinkler_user: String,
+
+    /// The password to connect to the database with
     pub sqlsprinkler_pass: String,
+
+    /// The database host to connect to
     pub sqlsprinkler_host: String,
+
+    /// The name of the database to connect to
     pub sqlsprinkler_db: String,
+
+    /// The host of the mqtt broker.
     pub mqtt_host: String,
+
+    /// The user to connect to the mqtt broker as
     pub mqtt_user: String,
+
+    /// The password to connect to the mqtt broker with
     pub mqtt_pass: String,
+
+    /// Whether or not mqtt should be enabled
     pub mqtt_enabled: bool,
+
+    /// Whether or not the application should be running in verbose mode.
     pub verbose: bool,
 }
 
@@ -53,6 +71,7 @@ impl Clone for MyConfig {
     }
 }
 
+/// Get the current configuration
 pub fn get_settings() -> MyConfig {
     SETTINGS.read().unwrap().clone()
 }
