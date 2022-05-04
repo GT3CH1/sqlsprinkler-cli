@@ -67,7 +67,7 @@ pub fn mqtt_run() -> ! {
             println!("{} - {}", topic, payload_str);
             // Iterate through the zones and turn on the zones that match the topic
             for zone in ZONES.read().unwrap().iter() {
-                check_msg_topic(topic, &payload_str, zone);
+                check_msg_topic(topic, &payload_str, zone.1);
             }
             // Check if topic is sqlsprinkler_system/command
             check_system_command_topic(topic, payload_str);
@@ -124,18 +124,26 @@ fn check_system_command_topic(topic: &str, payload_str: Cow<str>) {
 }
 
 /// Checks if the given topic matches the zone topic, zone time topic, zone auto off topic, or zone enabled topic
-fn check_msg_topic(topic: &str, payload_str: &str, zone: (&String, &Zone)) {
-    check_msg_zone(topic, payload_str, zone);
+/// # Arguments
+/// * `topic` - topic to check
+/// * `payload_str` - payload to check
+/// * `zone` - The sprinkler zone to check
+fn check_msg_topic(topic: &str, payload_str: &str, zone: &Zone) {
+    check_msg_zone(topic, payload_str, &zone);
     // check if the payload matches sqlsprinkler_zone_<zone_id>_time
-    check_msg_time(topic, payload_str, zone);
+    check_msg_time(topic, payload_str, &zone);
     // check if payload matches sqlsprinkler_zone_<zone_id>_auto_off_state
-    check_msg_autooff(topic, payload_str, zone);
+    check_msg_autooff(topic, payload_str, &zone);
     // check if payload matches sqlsprinkler_zone_<zone_id>_enabled_state
-    check_msg_enabled_state(topic, payload_str, zone)
+    check_msg_enabled_state(topic, payload_str, &zone)
 }
 
 /// Checks if the given topic matches the zone enabled topic - sqlsprinkler_zone_<zone_id>_enabled_state/command
-fn check_msg_enabled_state(topic: &str, payload_str: &str, zone: (&String, &Zone)) {
+/// # Arguments
+/// * `topic` - topic to check
+/// * `payload_str` - payload to check
+/// * `zone` - The sprinkler zone to check
+fn check_msg_enabled_state(topic: &str, payload_str: &str, zone: &Zone) {
     if topic == format!("sqlsprinkler_zone_{}_enabled_state/command", zone.1.id) {
         let enabled_state = payload_str.parse::<bool>().unwrap();
         let mut new_zone = zone.1.clone();
@@ -145,7 +153,11 @@ fn check_msg_enabled_state(topic: &str, payload_str: &str, zone: (&String, &Zone
 }
 
 /// Checks if the given topic matches the zone auto off topic - sqlsprinkler_zone_<zone_id>_auto_off_state/command
-fn check_msg_autooff(topic: &str, payload_str: &str, zone: (&String, &Zone)) {
+/// # Arguments
+/// * `topic` - topic to check
+/// * `payload_str` - payload to check
+/// * `zone` - The sprinkler zone to check
+fn check_msg_autooff(topic: &str, payload_str: &str, zone: &Zone) {
     if topic == format!("sqlsprinkler_zone_{}_auto_off_state/command", zone.1.id) {
         let auto_off_state = payload_str.parse::<bool>().unwrap();
         let mut new_zone = zone.1.clone();
@@ -155,8 +167,12 @@ fn check_msg_autooff(topic: &str, payload_str: &str, zone: (&String, &Zone)) {
 }
 
 /// Checks if the given topic matches the zone time topic - sqlsprinkler_zone_<zone_id>_time/command
-fn check_msg_time(topic: &str, payload_str: &str, zone: (&String, &Zone)) {
-    if topic == format!("sqlsprinkler_zone_{}_time/command", zone.1.id) {
+/// # Arguments
+/// * `topic` - topic to check
+/// * `payload_str` - payload to check
+/// * `zone` - The sprinkler zone to check
+fn check_msg_time(topic: &str, payload_str: &str, zone: &Zone) {
+    if topic == format!("sqlsprinkler_zone_{}_time/command", zone.id) {
         let time = payload_str.parse::<u64>().unwrap();
         let mut new_zone = zone.1.clone();
         new_zone.time = time;
@@ -165,8 +181,12 @@ fn check_msg_time(topic: &str, payload_str: &str, zone: (&String, &Zone)) {
 }
 
 /// Checks if the given topic matches the zone topic - sqlsprinkler_zone_<zone_id>/command
-fn check_msg_zone(topic: &str, payload_str: &str, zone: (&String, &Zone)) {
-    if topic == format!("sqlsprinkler_zone_{}/command", zone.1.id) {
+/// # Arguments
+/// * `topic` - topic to check
+/// * `payload_str` - payload to check
+/// * `zone` - The sprinkler zone to check
+fn check_msg_zone(topic: &str, payload_str: &str, zone: &Zone) {
+    if topic == format!("sqlsprinkler_zone_{}/command", zone.id) {
         turn_off_all_zones();
         if payload_str == "ON" {
             zone.1.turn_on();
@@ -174,6 +194,11 @@ fn check_msg_zone(topic: &str, payload_str: &str, zone: (&String, &Zone)) {
     }
 }
 
+/// The callback method for when the client successfully connects to the MQTT broker.
+/// This method will broadcast the home assistant discovery message.
+/// # Arguments
+/// * `cli` - The MQTT client
+/// * `_msgid` - The message ID (unused)
 fn on_connect_success(cli: &mqtt::AsyncClient, _msgid: u16) {
     println!("Connection succeeded");
 
@@ -252,13 +277,12 @@ fn on_connect_success(cli: &mqtt::AsyncClient, _msgid: u16) {
     }
 }
 
-// Callback for a failed attempt to connect to the server.
-// We simply sleep and then try again.
-//
-// Note that normally we don't want to do a blocking operation or sleep
-// from  within a callback. But in th`is case, we know that the client is
-// *not* conected, and thus not doing anything important. So we don't worry
-// too much about stopping its callback thread.
+/// Callback for a failed attempt to connect to the server.
+/// We simply sleep and then try again.
+/// # Arguments
+/// * `cli` - The mqtt client
+/// * `_msgid` - The message id (unused)
+/// * `rc` - The reason for the failure
 fn on_connect_failure(cli: &mqtt::AsyncClient, _msgid: u16, rc: i32) {
     println!("Connection attempt failed with error code {}.\n", rc);
     thread::sleep(Duration::from_millis(2500));
