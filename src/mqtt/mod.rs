@@ -1,2 +1,2 @@
 pub mod mqtt_client;
-pub mod mqttsprinkler;
+pub mod mqttdevice;

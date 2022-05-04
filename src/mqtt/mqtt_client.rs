@@ -1,4 +1,4 @@
-use crate::mqtt::mqttsprinkler;
+use crate::mqtt::mqttdevice;
 use crate::{
     get_settings, get_system_status, get_zones, serde_json, set_system_status, turn_off_all_zones,
     Zone,
@@ -206,7 +206,7 @@ fn on_connect_success(cli: &mqtt::AsyncClient, _msgid: u16) {
     for zone in get_zones().zones {
         // Broadcast the zone discovery message to the MQTT broker (as a switch)
         let mut zone_topic = format!("homeassistant/switch/sqlsprinkler_zone_{}/config", &zone.id);
-        let mut mqtt_sprinkler = mqttsprinkler::MqttSprinkler::sprinkler(&zone);
+        let mut mqtt_sprinkler = mqttdevice::MqttDevice::sprinkler(&zone);
         let mut payload = serde_json::to_string(&mqtt_sprinkler).unwrap();
         let mut msg = mqtt::Message::new(zone_topic.clone(), payload.clone(), 0);
         println!("Sending MQTT message: {}", payload.clone());
@@ -221,7 +221,7 @@ fn on_connect_success(cli: &mqtt::AsyncClient, _msgid: u16) {
             "homeassistant/number/sqlsprinkler_zone_{}_time/config",
             &zone.id
         );
-        mqtt_sprinkler = mqttsprinkler::MqttSprinkler::zone_time(&zone);
+        mqtt_sprinkler = mqttdevice::MqttDevice::zone_time(&zone);
         payload = serde_json::to_string(&mqtt_sprinkler).unwrap();
         msg = mqtt::Message::new(zone_topic.clone(), payload.clone(), 0);
         println!("Sending MQTT message: {}", payload.clone());
@@ -236,7 +236,7 @@ fn on_connect_success(cli: &mqtt::AsyncClient, _msgid: u16) {
             "homeassistant/switch/sqlsprinkler_zone_{}_auto_off/config",
             &zone.id
         );
-        mqtt_sprinkler = mqttsprinkler::MqttSprinkler::zone_auto_off(&zone);
+        mqtt_sprinkler = mqttdevice::MqttDevice::zone_auto_off(&zone);
         payload = serde_json::to_string(&mqtt_sprinkler).unwrap();
         msg = mqtt::Message::new(zone_topic.clone(), payload.clone(), 0);
         println!("Sending MQTT message: {}", payload.clone());
@@ -251,7 +251,7 @@ fn on_connect_success(cli: &mqtt::AsyncClient, _msgid: u16) {
             "homeassistant/switch/sqlsprinkler_zone_{}_enabled/config",
             &zone.id
         );
-        mqtt_sprinkler = mqttsprinkler::MqttSprinkler::zone_enabled(&zone);
+        mqtt_sprinkler = mqttdevice::MqttDevice::zone_enabled(&zone);
         payload = serde_json::to_string(&mqtt_sprinkler).unwrap();
         msg = mqtt::Message::new(zone_topic.clone(), payload.clone(), 0);
         println!("Sending MQTT message: {}", payload.clone());
@@ -264,7 +264,7 @@ fn on_connect_success(cli: &mqtt::AsyncClient, _msgid: u16) {
 
     // broadcast the system toggle
     let topic = "homeassistant/switch/sqlsprinkler_system/config";
-    let system = mqttsprinkler::MqttSprinkler::system();
+    let system = mqttdevice::MqttDevice::system();
     let payload = serde_json::to_string(&system).unwrap();
     let msg = mqtt::Message::new(topic, payload.clone(), 0);
     ZONES.write().unwrap().insert(system.cmd_t, Zone::default());
