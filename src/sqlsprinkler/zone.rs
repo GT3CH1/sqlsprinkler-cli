@@ -169,7 +169,8 @@ impl Clone for Zone {
         }
     }
 }
-
+/// Formats the zone to be displayed as
+/// `name | gpio | time | auto_off | enabled | system_order | id`
 impl fmt::Display for Zone {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -253,6 +254,7 @@ pub struct ZoneWithState {
     pub id: i8,
 }
 
+/// Used for reordering zones.
 #[derive(Clone)]
 pub struct ZoneList {
     pub zones: Vec<Zone>,
