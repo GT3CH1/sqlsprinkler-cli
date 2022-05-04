@@ -69,7 +69,7 @@ impl Zone {
     }
 
     /// Turns the zone on for 12 seconds and then turn off.
-    pub fn test_zone(&self) {
+    pub fn test(&self) {
         if get_settings().verbose {
             println!("Testing {}", self.name)
         }
@@ -81,7 +81,7 @@ impl Zone {
 
     /// Runs this zone, and automatically turn it off if launched from another thread and if
     /// `auto_off` is set to true for this zone. Will run for `time` minutes
-    pub fn run_zone_threaded(&self) {
+    pub fn run_async(&self) {
         self.turn_on();
         if self.auto_off {
             // Need to clone because we are moving into a new thread.
@@ -95,7 +95,7 @@ impl Zone {
     }
 
     /// Runs this zone in a blocking fashion.
-    pub fn run_zone(&self) {
+    pub fn run(&self) {
         self.turn_on();
         let _zone = self.clone();
         let run_time = time::Duration::from_secs(_zone.time * 60);
@@ -108,7 +108,7 @@ impl Zone {
     ///     * `zone` A zone struct representing the new values for this zone.
     /// # Return
     ///     * `ok` A bool representing whether or not the update was successful
-    pub fn update_zone(&self, zone: Zone) -> bool {
+    pub fn update(&self, zone: Zone) -> bool {
         let query = get_pool().prepare("UPDATE Zones SET Name=:name, Gpio=:gpio, Time=:time, AutoOff=:autooff,Enabled=:enabled,SystemOrder=:so WHERE ID=:id").into_iter();
         let mut updated: bool = false;
         for mut stmt in query.into_iter() {
@@ -125,10 +125,11 @@ impl Zone {
         updated
     }
 
+
     /// Gets a representation of this zone, but also with `is_on` as bool `state`
     /// # Return
     /// `zone_with_state` A ZoneWithState struct representing this zone and its current state.
-    pub fn get_zone_with_state(&self) -> ZoneWithState {
+    pub fn get_with_state(&self) -> ZoneWithState {
         let new_zone = ZoneWithState {
             name: self.get_name(),
             gpio: self.gpio,
@@ -148,7 +149,7 @@ impl Zone {
     pub fn set_order(&self, order: i8) {
         let mut updated_zone = self.clone();
         updated_zone.system_order = order;
-        self.update_zone(updated_zone);
+        self.update(updated_zone);
     }
 }
 

@@ -140,7 +140,7 @@ fn main() {
                     }
                     ZoneOptsArgs::Status => {
                         let zone = &my_zone;
-                        zone.get_zone_with_state().state;
+                        zone.get_with_state().state;
                     }
                 }
             }
@@ -188,7 +188,7 @@ fn main() {
                     SysOpts::Test => {
                         turn_off_all_zones();
                         for zone in zone_list.zones {
-                            zone.test_zone();
+                            zone.test();
                         }
                     }
                 }

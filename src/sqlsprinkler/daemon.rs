@@ -148,7 +148,7 @@ async fn get_zone_status() -> Result<impl warp::Reply, warp::Rejection> {
     let mut zone_status_list: Vec<zone::ZoneWithState> = Vec::new();
     for zone in zone_list.zones.iter() {
         let _zone = &zone;
-        let zone_with_status = _zone.get_zone_with_state();
+        let zone_with_status = _zone.get_with_state();
         zone_status_list.push(zone_with_status);
     }
     Ok(warp::reply::json(&zone_status_list))
@@ -168,7 +168,7 @@ async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, wa
 
         // Ensure that all zones are off
         turn_off_all_zones();
-        zone.run_zone_threaded();
+        zone.run_async();
     } else {
         zone.turn_off();
     }
@@ -195,8 +195,8 @@ async fn _delete_zone(_zone: zone::ZoneDelete) -> Result<impl warp::Reply, warp:
 /// # Params
 ///     * `_zone` The zone we want to update.
 async fn _update_zone(_zone: zone::Zone) -> Result<impl warp::Reply, warp::Rejection> {
-    let zone = get_zone_from_id(_zone.id);
-    zone.update_zone(_zone);
+    let zone = zone::get_zone_from_id(_zone.id);
+    zone.update(_zone);
     Ok(warp::reply::with_status("Updated zone", http::StatusCode::OK))
 }
 
