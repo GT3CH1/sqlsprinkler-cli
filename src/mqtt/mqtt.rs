@@ -35,7 +35,7 @@ pub fn mqtt_run() -> ! {
     let mqtt_pass = get_settings().mqtt_pass;
 
     // create the mqtt client
-    let mqtt_client = mqtt::AsyncClient::new(mqtt_host.to_string()).unwrap();
+    let mqtt_client = mqtt::AsyncClient::new(mqtt_host).unwrap();
     let opts = mqtt::ConnectOptionsBuilder::new()
         .user_name(mqtt_user)
         .password(mqtt_pass)
@@ -79,31 +79,33 @@ pub fn mqtt_run() -> ! {
         for zone in get_zones().zones {
             // send current status
             let mut topic = format!("sqlsprinkler_zone_{}/status", zone.id);
-            let mut payload = format!("{}", if zone.get_with_state().state { "ON" } else { "OFF" });
+            let mut payload = if zone.get_with_state().state { "ON" } else { "OFF" };
             let mut msg = mqtt::Message::new(topic, payload, 0);
             mqtt_client.publish(msg);
 
             // send current time
             topic = format!("sqlsprinkler_zone_{}_time/status", zone.id);
-            payload = format!("{}", zone.time);
+            // Set payload to zone.time
+            let tmp_payload = format!("{}", zone.time);
+            payload = tmp_payload.as_str();
             msg = mqtt::Message::new(topic, payload, 0);
             mqtt_client.publish(msg);
 
             // send current auto off state
             topic = format!("sqlsprinkler_zone_{}_auto_off_state/status", zone.id);
-            payload = format!("{}", if zone.auto_off { "ON" } else { "OFF" });
+            payload = if zone.auto_off { "ON" } else { "OFF" };
             msg = mqtt::Message::new(topic, payload, 0);
             mqtt_client.publish(msg);
 
             // send current enabled state
             topic = format!("sqlsprinkler_zone_{}_enabled_state/status", zone.id);
-            payload = format!("{}", if zone.enabled { "ON" } else { "OFF" });
+            payload =  if zone.enabled { "ON" } else { "OFF" } ;
             msg = mqtt::Message::new(topic, payload, 0);
             mqtt_client.publish(msg);
         }
         // send current status of the system switch
-        let topic = format!("sqlsprinkler_system/status");
-        let payload = format!("{}", if get_system_status() { "ON" } else { "OFF" });
+        let topic = "sqlsprinkler_system/status";
+        let payload = if get_system_status() { "ON" } else { "OFF" };
         let msg = mqtt::Message::new(topic, payload, 0);
         mqtt_client.publish(msg);
     }
@@ -216,9 +218,9 @@ fn on_connect_success(cli: &mqtt::AsyncClient, _msgid: u16) {
     let payload = serde_json::to_string(&system).unwrap();
     let msg = mqtt::Message::new(topic, payload.clone(), 0);
     ZONES.write().unwrap().insert(system.cmd_t, Zone::default());
-    println!("Sending MQTT message: {}", payload.clone());
+    println!("Sending MQTT message: {}", payload);
     cli.publish(msg);
-    // Subscrive to all zone topics
+    // Subscribe to all zone topics
     for zone in ZONES.read().unwrap().keys() {
         cli.subscribe(zone, 0);
         println!("Subscribed to {}", zone);

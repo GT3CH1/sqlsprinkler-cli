@@ -85,7 +85,6 @@ enum SysOpts {
 }
 
 
-
 fn main() {
     let cli = Opts::from_args();
     println!("{:?}", cli);
@@ -130,7 +129,7 @@ fn main() {
                         panic!("Zone {} not found.", id);
                     }
                 };
-                match ZoneOptsArgs::from(zone_state.state.parse().unwrap()) {
+                match zone_state.state.parse().unwrap() {
                     ZoneOptsArgs::On => {
                         turn_off_all_zones();
                         my_zone.turn_on();
@@ -141,6 +140,7 @@ fn main() {
                     ZoneOptsArgs::Status => {
                         let zone = &my_zone;
                         zone.get_with_state().state;
+                        println!("The zone is {}", if zone.get_with_state().state { "on" } else { "off" });
                     }
                 }
             }
@@ -165,10 +165,8 @@ fn main() {
                                 println!("Running the system schedule.");
                             }
                             sqlsprinkler::system::run();
-                        } else {
-                            if get_settings().verbose {
-                                println!("System is not enabled, refusing.");
-                            }
+                        } else if get_settings().verbose {
+                            println!("System is not enabled, refusing.");
                         }
                     }
                     SysOpts::Winterize => {

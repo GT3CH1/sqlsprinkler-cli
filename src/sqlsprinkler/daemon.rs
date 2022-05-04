@@ -145,7 +145,7 @@ async fn set_sys_status(_status: SysStatus) -> Result<impl warp::Reply, warp::Re
 
 /// Gets the status of all the zones.
 async fn get_zone_status() -> Result<impl warp::Reply, warp::Rejection> {
-    let zone_list = sqlsprinkler::system::get_zones().clone();
+    let zone_list = system::get_zones();
     let mut zone_status_list: Vec<zone::ZoneWithState> = Vec::new();
     for zone in zone_list.zones.iter() {
         let _zone = &zone;
@@ -206,17 +206,16 @@ async fn _update_zone(_zone: zone::Zone) -> Result<impl warp::Reply, warp::Rejec
 ///     * `_order` The new ordering of the system
 async fn _update_order(_order: zone::ZoneOrder) -> Result<impl warp::Reply, warp::Rejection> {
     let zone_list = system::get_zones();
-    let _zone_list = zone_list.clone();
     let mut counter = 0;
-    if _zone_list.zones.len() == _order.order.len() {
-        for zone in _zone_list.zones.iter() {
+    if zone_list.zones.len() == _order.order.len() {
+        for zone in zone_list.zones.iter() {
             let mut _zone = &zone;
             let new_order = _order.order.as_slice()[counter];
             _zone.set_order(new_order);
-            counter = counter + 1;
+            counter += 1;
         }
         Ok(warp::reply::with_status("ok", http::StatusCode::OK))
     } else {
-        Err(warp::reject::custom(LengthMismatch))
+        Err(reject::custom(LengthMismatch))
     }
 }

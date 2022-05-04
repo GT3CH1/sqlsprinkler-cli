@@ -130,7 +130,7 @@ impl Zone {
     /// # Return
     /// `zone_with_state` A ZoneWithState struct representing this zone and its current state.
     pub fn get_with_state(&self) -> ZoneWithState {
-        let new_zone = ZoneWithState {
+        ZoneWithState {
             name: self.get_name(),
             gpio: self.gpio,
             time: self.time,
@@ -139,8 +139,7 @@ impl Zone {
             system_order: self.system_order,
             state: self.is_on(),
             id: self.id,
-        };
-        new_zone
+        }
     }
 
     /// Updates the order of this zone
@@ -158,12 +157,12 @@ impl Clone for Zone {
     fn clone(&self) -> Self {
         Zone {
             name: self.name.clone(),
-            gpio: self.gpio.clone(),
-            time: self.time.clone(),
-            enabled: self.enabled.clone(),
-            auto_off: self.auto_off.clone(),
-            system_order: self.system_order.clone(),
-            id: self.id.clone(),
+            gpio: self.gpio,
+            time: self.time,
+            enabled: self.enabled,
+            auto_off: self.auto_off,
+            system_order: self.system_order,
+            id: self.id,
         }
     }
 }
@@ -184,8 +183,8 @@ impl From<Row> for Zone {
             name: row.get(0).unwrap(),
             gpio: row.get(1).unwrap(),
             time: row.get(2).unwrap(),
-            enabled: row.get::<_,_>(3).unwrap(),
-            auto_off: row.get::<_,_>(4).unwrap(),
+            enabled: row.get::<_, _>(3).unwrap(),
+            auto_off: row.get::<_, _>(4).unwrap(),
             system_order: row.get(5).unwrap(),
             id: row.get(6).unwrap(),
         }
@@ -256,21 +255,21 @@ pub fn get_zone_from_id(zone_id: i8) -> Zone {
     let mut stmt = pool.prepare("SELECT Name, Gpio, Time, Enabled, AutoOff, SystemOrder, ID from Zones WHERE ID = :zi").unwrap();
     let mut _zone = Zone::default();
 
-    let rows = stmt.execute(params!{"zi" => zone_id}).unwrap();
+    let mut rows = stmt.execute(params! {"zi" => zone_id}).unwrap();
 
-    for row in rows {
-        let _row = row.unwrap();
-
-        _zone = Zone::from(_row);
+    // Get the first row in rows
+    if rows.affected_rows() < 1 {
         if get_settings().verbose {
-            println!("{:?}", _zone);
+            println!("Default zone on get_zone_from_id");
         }
         return _zone;
     }
+    let row = rows.next().unwrap().unwrap();
+    _zone = Zone::from(row);
     if get_settings().verbose {
-        println!("Default zone on get_zone_from_id");
+        println!("{:?}", _zone);
     }
-    return _zone;
+    _zone
 }
 
 /// Deletes the given zone

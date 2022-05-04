@@ -26,7 +26,7 @@ pub fn set_system_status(enabled: bool) {
 ///     * `bool` True if the system is enabled, false if not.
 pub(crate) fn get_system_status() -> bool {
     let pool = get_pool();
-    let query = format!("SELECT enabled FROM Enabled");
+    let query = "SELECT enabled FROM Enabled";
     let sys_status: Vec<SysStatus> =
         pool.prep_exec(query, ())
             .map(|result| {
@@ -37,8 +37,7 @@ pub(crate) fn get_system_status() -> bool {
                     }
                 }).collect()
             }).unwrap();
-    //TODO: Rewrite this method so this ugly line does not need to exist.
-    return sys_status[0].status;
+    sys_status[0].status
 }
 
 /// Gets a list of all the zones in this database
@@ -62,10 +61,9 @@ pub(crate) fn get_zones() -> zone::ZoneList {
         let zone = zone::Zone::from(_row);
         zone_list.push(zone);
     }
-    let list = zone::ZoneList {
+    zone::ZoneList {
         zones: zone_list
-    };
-    return list;
+    }
 }
 
 
