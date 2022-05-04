@@ -2,7 +2,7 @@ use serde::{Serialize, Deserialize};
 use std::convert::From;
 use std::{thread, time, fmt};
 use rppal::gpio::{Gpio, OutputPin};
-use mysql::Row;
+use mysql::{params, Row, Value};
 use crate::sqlsprinkler::get_pool;
 use crate::get_settings;
 
@@ -109,14 +109,20 @@ impl Zone {
     /// # Return
     ///     * `ok` A bool representing whether or not the update was successful
     pub fn update_zone(&self, zone: Zone) -> bool {
-        let pool = get_pool();
-        let query = format!("UPDATE Zones SET Name='{}', Gpio={}, Time={},AutoOff={},Enabled={},SystemOrder={} WHERE ID={}"
-                            , zone.name, zone.gpio, zone.time, zone.auto_off, zone.enabled, zone.system_order, zone.id);
-        let result = match pool.prep_exec(query, ()) {
-            Ok(..) => true,
-            Err(..) => false
-        };
-        result
+        let query = get_pool().prepare("UPDATE Zones SET Name=:name, Gpio=:gpio, Time=:time, AutoOff=:autooff,Enabled=:enabled,SystemOrder=:so WHERE ID=:id").into_iter();
+        let mut updated: bool = false;
+        for mut stmt in query.into_iter() {
+            updated = stmt.execute(params! {
+                "name" => &zone.name,
+                "gpio" => zone.gpio,
+                "time" => zone.time,
+                "autooff" => zone.auto_off,
+                "enabled" => zone.enabled,
+                "so" => zone.system_order,
+                "id" => self.id
+            }).unwrap().affected_rows() == 1;
+        }
+        updated
     }
 
     /// Gets a representation of this zone, but also with `is_on` as bool `state`
@@ -163,7 +169,6 @@ impl Clone for Zone {
 
 impl fmt::Display for Zone {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        //NOTE: Dear god why did I think this was a good format.
         write!(f, "{} | {} | {} | {} | {} | {} | {}", self.name, self.gpio, self.time, self.enabled, self.auto_off, self.system_order, self.id)
     }
 }
@@ -171,12 +176,15 @@ impl fmt::Display for Zone {
 /// Converts a row from the MySQL database to a Zone struct.
 impl From<Row> for Zone {
     fn from(row: Row) -> Self {
+        if get_settings().verbose {
+            println!("{:?}", row);
+        }
         Zone {
             name: row.get(0).unwrap(),
             gpio: row.get(1).unwrap(),
             time: row.get(2).unwrap(),
-            enabled: row.get(3).unwrap(),
-            auto_off: row.get(4).unwrap(),
+            enabled: row.get::<_,_>(3).unwrap(),
+            auto_off: row.get::<_,_>(4).unwrap(),
             system_order: row.get(5).unwrap(),
             id: row.get(6).unwrap(),
         }
@@ -242,19 +250,24 @@ pub struct ZoneList {
 ///     * `zone_id` The id of the zone we want to get
 /// # Return
 ///     * `Zone` The zone that corresponds to the given id.
-pub fn get_zone_from_order(zone_order: i8) -> Zone {
-    let pool = get_pool();
-    let mut conn = pool.get_conn().unwrap();
-    let query = format!("SELECT Name, Gpio, Time, Enabled, AutoOff, SystemOrder, ID from Zones WHERE SystemOrder={}", zone_order);
-    if get_settings().verbose {
-        println!("{}", query);
-    }
-    let rows = conn.query(query).unwrap();
+pub fn get_zone_from_id(zone_id: i8) -> Zone {
+    let mut pool = get_pool().get_conn().unwrap();
+    let mut stmt = pool.prepare("SELECT Name, Gpio, Time, Enabled, AutoOff, SystemOrder, ID from Zones WHERE ID = :zi").unwrap();
     let mut _zone = Zone::default();
+
+    let rows = stmt.execute(params!{"zi" => zone_id}).unwrap();
+
     for row in rows {
         let _row = row.unwrap();
+
         _zone = Zone::from(_row);
+        if get_settings().verbose {
+            println!("{:?}", _zone);
+        }
         return _zone;
+    }
+    if get_settings().verbose {
+        println!("Default zone on get_zone_from_id");
     }
     return _zone;
 }
@@ -266,11 +279,11 @@ pub fn get_zone_from_order(zone_order: i8) -> Zone {
 ///     * a bool representing if the deletion was successful (true) or not (false)
 pub fn delete_zone(_zone: ZoneDelete) -> bool {
     let pool = get_pool();
-    let query = format!("DELETE FROM `Zones` WHERE id = {}", _zone.id);
+    let query = "DELETE FROM `Zones` WHERE id = ?";
     if get_settings().verbose {
         println!("{}", query);
     }
-    let result = match pool.prep_exec(query, ()) {
+    let result = match pool.prep_exec(query, (_zone.id, )) {
         Ok(..) => true,
         Err(..) => {
             if get_settings().verbose {
@@ -290,12 +303,12 @@ pub fn delete_zone(_zone: ZoneDelete) -> bool {
 ///     * A bool representing whether or not the insert was successful (true) or failed (false)
 pub fn add_new_zone(_zone: ZoneAdd) -> bool {
     let pool = get_pool();
-    let query = format!("INSERT into `Zones` (`Name`, `Gpio`, `Time`, `AutoOff`, `Enabled`) VALUES \
-     ( '{}','{}','{}',{},{} )", _zone.name, _zone.gpio, _zone.time, _zone.auto_off, _zone.enabled);
+    let query = "INSERT into `Zones` (`Name`, `Gpio`, `Time`, `AutoOff`, `Enabled`) VALUES ( ?,?,?,?,? )";
+
     if get_settings().verbose {
         println!("{}", query);
     }
-    let result = match pool.prep_exec(query, ()) {
+    let result = match pool.prep_exec(query, (_zone.name, _zone.gpio, _zone.time, _zone.auto_off, _zone.enabled, )) {
         Ok(..) => true,
         Err(e) => {
             if get_settings().verbose {

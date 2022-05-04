@@ -16,8 +16,7 @@ pub(crate) fn get_pool() -> Pool {
     let reader = get_settings();
     let url = format!("mysql://{}:{}@{}:3306/{}",
                       reader.sqlsprinkler_user, reader.sqlsprinkler_pass, reader.sqlsprinkler_host, reader.sqlsprinkler_db);
-
-    let pool = match mysql::Pool::new(url) {
+    let pool = match Pool::new(url) {
         Ok(p) => p,
         Err(_e) => {
             println!("Could not connect! Did you set the username/password correctly?");

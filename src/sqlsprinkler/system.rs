@@ -14,8 +14,8 @@ pub struct SysStatus {
 ///     * `enabled` If true is passed in, the system is enabled. If false is used, the system is disabled.
 pub fn set_system_status(enabled: bool) {
     let pool = get_pool();
-    let query = format!("UPDATE Enabled set enabled = {}", enabled);
-    pool.prep_exec(query, ()).unwrap();
+    let query = "UPDATE Enabled set enabled = ?";
+    pool.prep_exec(query, (enabled,)).unwrap();
 }
 
 

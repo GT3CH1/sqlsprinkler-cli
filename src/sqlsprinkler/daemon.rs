@@ -1,7 +1,7 @@
 use crate::{get_system_status, set_system_status, turn_off_all_zones, sqlsprinkler};
 use warp::{Filter, http, reject};
 use serde::{Serialize, Deserialize};
-use crate::sqlsprinkler::{zone, zone::get_zone_from_order, system};
+use crate::sqlsprinkler::{zone, zone::get_zone_from_id, system};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct SysStatus {
@@ -157,7 +157,7 @@ async fn get_zone_status() -> Result<impl warp::Reply, warp::Rejection> {
 /// Sets the id of the zone to the given state -> IE, turning on a zone.
 async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, warp::Rejection> {
     let state = _zone.state;
-    let zone = get_zone_from_order(_zone.id);
+    let zone = get_zone_from_id(_zone.id);
     if state {
         /*
         NOTE:
@@ -195,7 +195,7 @@ async fn _delete_zone(_zone: zone::ZoneDelete) -> Result<impl warp::Reply, warp:
 /// # Params
 ///     * `_zone` The zone we want to update.
 async fn _update_zone(_zone: zone::Zone) -> Result<impl warp::Reply, warp::Rejection> {
-    let zone = zone::get_zone_from_order(_zone.id);
+    let zone = get_zone_from_id(_zone.id);
     zone.update_zone(_zone);
     Ok(warp::reply::with_status("Updated zone", http::StatusCode::OK))
 }
