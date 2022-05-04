@@ -2,6 +2,7 @@ use crate::{get_system_status, set_system_status, turn_off_all_zones, sqlsprinkl
 use warp::{Filter, http, reject};
 use serde::{Serialize, Deserialize};
 use crate::sqlsprinkler::{zone, zone::get_zone_from_id, system};
+use crate::sqlsprinkler::zone::ZoneOrder;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct SysStatus {
@@ -118,7 +119,7 @@ fn zone_json() -> impl Filter<Extract=(zone::Zone, ), Error=warp::Rejection> + C
 }
 
 /// Used to filter a put request to re-order the system
-fn order_json() -> impl Filter<Extract=(zone::ZoneOrder, ), Error=warp::Rejection> + Clone {
+fn order_json() -> impl Filter<Extract=(ZoneOrder, ), Error=warp::Rejection> + Clone {
     warp::body::content_length_limit(1024 * 16)
         .and(warp::body::json())
 }

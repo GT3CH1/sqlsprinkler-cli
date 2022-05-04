@@ -2,7 +2,7 @@ use serde::{Serialize, Deserialize};
 use std::convert::From;
 use std::{thread, time, fmt};
 use rppal::gpio::{Gpio, OutputPin};
-use mysql::{params, Row, Value};
+use mysql::{params, Row};
 use crate::sqlsprinkler::get_pool;
 use crate::get_settings;
 
