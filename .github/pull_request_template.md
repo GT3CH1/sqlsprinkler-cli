@@ -1,7 +1,6 @@
 Describe your changes
 ---
 
-
 Enter a detailed description of the changes you made.
 
 ---
