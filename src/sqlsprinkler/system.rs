@@ -51,14 +51,15 @@ pub(crate) fn get_zones() -> zone::ZoneList {
     let mut conn = pool.get_conn().unwrap();
     let query = "SELECT Name, GPIO, Time, Enabled, AutoOff, SystemOrder, ID from Zones ORDER BY SystemOrder";
     let rows = conn.query(query).unwrap();
-    if get_settings().verbose {
-        println!("{}", query);
-    }
     let mut zone_list: Vec<zone::Zone> = vec![];
     for row in rows {
         let _row = row.unwrap();
+
         let zone = zone::Zone::from(_row);
-        zone_list.push(zone);
+        zone_list.push(zone.clone());
+        if get_settings().verbose {
+            println!("{}", zone);
+        }
     }
     zone::ZoneList { zones: zone_list }
 }

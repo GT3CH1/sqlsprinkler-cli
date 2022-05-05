@@ -1,4 +1,4 @@
-use crate::sqlsprinkler::zone::ZoneOrder;
+use crate::sqlsprinkler::zone::{get_zone_from_order, ZoneOrder};
 use crate::sqlsprinkler::{system, zone, zone::get_zone_from_id};
 use crate::{get_system_status, set_system_status, sqlsprinkler, turn_off_all_zones};
 use serde::{Deserialize, Serialize};
@@ -154,7 +154,7 @@ async fn get_zone_status() -> Result<impl warp::Reply, warp::Rejection> {
 ///    * `_zone` The ZoneToggle object containing the id of the zone we are going to toggle and the state we are going to set it to.
 async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, warp::Rejection> {
     let state = _zone.state;
-    let zone = get_zone_from_id(_zone.id);
+    let zone = get_zone_from_order(_zone.id);
     if state {
         /*
         NOTE:
@@ -198,7 +198,7 @@ async fn _delete_zone(_zone: zone::ZoneDelete) -> Result<impl warp::Reply, warp:
 /// # Params
 ///     * `_zone` The zone we want to update.
 async fn _update_zone(_zone: zone::Zone) -> Result<impl warp::Reply, warp::Rejection> {
-    let zone = zone::get_zone_from_id(_zone.id);
+    let zone = get_zone_from_id(_zone.id);
     zone.update(_zone);
     Ok(warp::reply::with_status(
         "Updated zone",

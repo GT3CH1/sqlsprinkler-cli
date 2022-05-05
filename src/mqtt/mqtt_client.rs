@@ -129,13 +129,13 @@ fn check_system_command_topic(topic: &str, payload_str: Cow<str>) {
 /// * `payload_str` - payload to check
 /// * `zone` - The sprinkler zone to check
 fn check_msg_topic(topic: &str, payload_str: &str, zone: &Zone) {
-    check_msg_zone(topic, payload_str, &zone);
+    check_msg_zone(topic, payload_str, zone);
     // check if the payload matches sqlsprinkler_zone_<zone_id>_time
-    check_msg_time(topic, payload_str, &zone);
+    check_msg_time(topic, payload_str, zone);
     // check if payload matches sqlsprinkler_zone_<zone_id>_auto_off_state
-    check_msg_autooff(topic, payload_str, &zone);
+    check_msg_autooff(topic, payload_str, zone);
     // check if payload matches sqlsprinkler_zone_<zone_id>_enabled_state
-    check_msg_enabled_state(topic, payload_str, &zone)
+    check_msg_enabled_state(topic, payload_str, zone)
 }
 
 /// Checks if the given topic matches the zone enabled topic - sqlsprinkler_zone_<zone_id>_enabled_state/command
@@ -144,11 +144,11 @@ fn check_msg_topic(topic: &str, payload_str: &str, zone: &Zone) {
 /// * `payload_str` - payload to check
 /// * `zone` - The sprinkler zone to check
 fn check_msg_enabled_state(topic: &str, payload_str: &str, zone: &Zone) {
-    if topic == format!("sqlsprinkler_zone_{}_enabled_state/command", zone.1.id) {
+    if topic == format!("sqlsprinkler_zone_{}_enabled_state/command", zone.id) {
         let enabled_state = payload_str.parse::<bool>().unwrap();
-        let mut new_zone = zone.1.clone();
+        let mut new_zone = zone.clone();
         new_zone.enabled = enabled_state;
-        zone.1.update(new_zone);
+        zone.update(new_zone);
     }
 }
 
@@ -158,11 +158,11 @@ fn check_msg_enabled_state(topic: &str, payload_str: &str, zone: &Zone) {
 /// * `payload_str` - payload to check
 /// * `zone` - The sprinkler zone to check
 fn check_msg_autooff(topic: &str, payload_str: &str, zone: &Zone) {
-    if topic == format!("sqlsprinkler_zone_{}_auto_off_state/command", zone.1.id) {
+    if topic == format!("sqlsprinkler_zone_{}_auto_off_state/command", zone.id) {
         let auto_off_state = payload_str.parse::<bool>().unwrap();
-        let mut new_zone = zone.1.clone();
+        let mut new_zone = zone.clone();
         new_zone.auto_off = auto_off_state;
-        zone.1.update(new_zone);
+        zone.update(new_zone);
     }
 }
 
@@ -174,9 +174,9 @@ fn check_msg_autooff(topic: &str, payload_str: &str, zone: &Zone) {
 fn check_msg_time(topic: &str, payload_str: &str, zone: &Zone) {
     if topic == format!("sqlsprinkler_zone_{}_time/command", zone.id) {
         let time = payload_str.parse::<u64>().unwrap();
-        let mut new_zone = zone.1.clone();
+        let mut new_zone = zone.clone();
         new_zone.time = time;
-        zone.1.update(new_zone);
+        zone.update(new_zone);
     }
 }
 
@@ -189,7 +189,7 @@ fn check_msg_zone(topic: &str, payload_str: &str, zone: &Zone) {
     if topic == format!("sqlsprinkler_zone_{}/command", zone.id) {
         turn_off_all_zones();
         if payload_str == "ON" {
-            zone.1.turn_on();
+            zone.turn_on();
         }
     }
 }

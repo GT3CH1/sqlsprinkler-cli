@@ -190,17 +190,14 @@ impl fmt::Display for Zone {
 /// Converts a row from the MySQL database to a Zone struct.
 impl From<Row> for Zone {
     fn from(row: Row) -> Self {
-        if get_settings().verbose {
-            println!("{:?}", row);
-        }
         Zone {
-            name: row.get(0).unwrap(),
-            gpio: row.get(1).unwrap(),
-            time: row.get(2).unwrap(),
-            enabled: row.get::<_, _>(3).unwrap(),
-            auto_off: row.get::<_, _>(4).unwrap(),
-            system_order: row.get(5).unwrap(),
-            id: row.get(6).unwrap(),
+            name: row.get("Name").unwrap(),
+            gpio: row.get("GPIO").unwrap(),
+            time: row.get("Time").unwrap(),
+            enabled: row.get("Enabled").unwrap(),
+            auto_off: row.get("AutoOff").unwrap(),
+            system_order: row.get("SystemOrder").unwrap(),
+            id: row.get("ID").unwrap(),
         }
     }
 }
@@ -266,20 +263,50 @@ pub struct ZoneList {
 /// # Return
 ///     * `Zone` The zone that corresponds to the given id.
 pub fn get_zone_from_id(zone_id: i8) -> Zone {
-    let mut pool = get_pool().get_conn().unwrap();
-    let mut stmt = pool
-        .prepare(
-            "SELECT Name, Gpio, Time, Enabled, AutoOff, SystemOrder, ID from Zones WHERE ID = :zi",
-        )
-        .unwrap();
-    let mut _zone = Zone::default();
+    let query = format!("SELECT Name,GPIO,Time,Enabled,AutoOff,SystemOrder,ID FROM Zones WHERE ID = {}", zone_id);
 
-    let mut rows = stmt.execute(params! {"zi" => zone_id}).unwrap();
-
+    let mut rows = get_pool().prep_exec(query,()).unwrap();
+    // let mut rows = stmt.prep+((zone_id,)).unwrap();
     // Get the first row in rows
-    if rows.affected_rows() < 1 {
+    if get_settings().verbose {
+        println!("Getting row from id: {}", zone_id);
+    }
+
+    let mut _zone = Zone::default();
+    if !rows.more_results_exists() {
         if get_settings().verbose {
-            println!("Default zone on get_zone_from_id");
+            println!("Default zone on get_zone_from_id: {}", zone_id);
+            println!("SELECT * FROM Zones WHERE id = {}",zone_id);
+        }
+        return _zone;
+    }
+    let row = rows.next().unwrap().unwrap();
+    _zone = Zone::from(row);
+    if get_settings().verbose {
+        println!("{:?}", _zone);
+    }
+    _zone
+}
+
+/// Gets a zone from the given id
+/// # Params
+///     * `zone_id` The id of the zone we want to get
+/// # Return
+///     * `Zone` The zone that corresponds to the given id.
+pub fn get_zone_from_order(zone_order: i8) -> Zone {
+    let query = format!("SELECT Name,GPIO,Time,Enabled,AutoOff,SystemOrder,ID FROM Zones WHERE SystemOrder = {}", zone_order);
+
+    let mut rows = get_pool().prep_exec(query,()).unwrap();
+    // let mut rows = stmt.prep+((zone_id,)).unwrap();
+    // Get the first row in rows
+    if get_settings().verbose {
+        println!("Getting row from system order: {}", zone_order);
+    }
+
+    let mut _zone = Zone::default();
+    if !rows.more_results_exists() {
+        if get_settings().verbose {
+            println!("Default zone on get_zone_from_order: {}", zone_order);
         }
         return _zone;
     }

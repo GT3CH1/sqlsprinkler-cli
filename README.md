@@ -1,5 +1,5 @@
 # sqlsprinkler-cli
-### v0.1.5
+### v0.1.6
 A command line interface for the SQLSprinkler project, made specifically for the raspberry pi.
 
 ## Authors & Contributors
@@ -12,7 +12,7 @@ A command line interface for the SQLSprinkler project, made specifically for the
     - Rust
 
 After installing the build dependencies, you can run `make deb` to create a `.deb` package, you can
-then install it with `sudo dpkg -i sqlsprinkler-cli_0.1.5_armhf.deb`.
+then install it with `sudo dpkg -i sqlsprinkler-cli_0.1.6_armhf.deb`.
 
 ## Installing
 * To install, please run `# make install`. This will install the binary to `/usr/bin/sqlsprinkler-cli`.
