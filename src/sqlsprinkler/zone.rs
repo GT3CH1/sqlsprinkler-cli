@@ -1,10 +1,10 @@
-use serde::{Serialize, Deserialize};
-use std::convert::From;
-use std::{thread, time, fmt};
-use rppal::gpio::{Gpio, OutputPin};
-use mysql::Row;
-use crate::sqlsprinkler::get_pool;
 use crate::get_settings;
+use crate::sqlsprinkler::get_pool;
+use mysql::{params, Row};
+use rppal::gpio::{Gpio, OutputPin};
+use serde::{Deserialize, Serialize};
+use std::convert::From;
+use std::{fmt, thread, time};
 
 /// Represents a SQLSprinkler zone.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -69,7 +69,7 @@ impl Zone {
     }
 
     /// Turns the zone on for 12 seconds and then turn off.
-    pub fn test_zone(&self) {
+    pub fn test(&self) {
         if get_settings().verbose {
             println!("Testing {}", self.name)
         }
@@ -81,7 +81,7 @@ impl Zone {
 
     /// Runs this zone, and automatically turn it off if launched from another thread and if
     /// `auto_off` is set to true for this zone. Will run for `time` minutes
-    pub fn run_zone_threaded(&self) {
+    pub fn run_async(&self) {
         self.turn_on();
         if self.auto_off {
             // Need to clone because we are moving into a new thread.
@@ -95,7 +95,7 @@ impl Zone {
     }
 
     /// Runs this zone in a blocking fashion.
-    pub fn run_zone(&self) {
+    pub fn run(&self) {
         self.turn_on();
         let _zone = self.clone();
         let run_time = time::Duration::from_secs(_zone.time * 60);
@@ -108,22 +108,32 @@ impl Zone {
     ///     * `zone` A zone struct representing the new values for this zone.
     /// # Return
     ///     * `ok` A bool representing whether or not the update was successful
-    pub fn update_zone(&self, zone: Zone) -> bool {
-        let pool = get_pool();
-        let query = format!("UPDATE Zones SET Name='{}', Gpio={}, Time={},AutoOff={},Enabled={},SystemOrder={} WHERE ID={}"
-                            , zone.name, zone.gpio, zone.time, zone.auto_off, zone.enabled, zone.system_order, zone.id);
-        let result = match pool.prep_exec(query, ()) {
-            Ok(..) => true,
-            Err(..) => false
-        };
-        result
+    pub fn update(&self, zone: Zone) -> bool {
+        let query = get_pool().prepare("UPDATE Zones SET Name=:name, Gpio=:gpio, Time=:time, AutoOff=:autooff,Enabled=:enabled,SystemOrder=:so WHERE ID=:id").into_iter();
+        let mut updated: bool = false;
+        for mut stmt in query {
+            updated = stmt
+                .execute(params! {
+                    "name" => &zone.name,
+                    "gpio" => zone.gpio,
+                    "time" => zone.time,
+                    "autooff" => zone.auto_off,
+                    "enabled" => zone.enabled,
+                    "so" => zone.system_order,
+                    "id" => self.id
+                })
+                .unwrap()
+                .affected_rows()
+                == 1;
+        }
+        updated
     }
 
     /// Gets a representation of this zone, but also with `is_on` as bool `state`
     /// # Return
     /// `zone_with_state` A ZoneWithState struct representing this zone and its current state.
-    pub fn get_zone_with_state(&self) -> ZoneWithState {
-        let new_zone = ZoneWithState {
+    pub fn get_with_state(&self) -> ZoneWithState {
+        ZoneWithState {
             name: self.get_name(),
             gpio: self.gpio,
             time: self.time,
@@ -132,8 +142,7 @@ impl Zone {
             system_order: self.system_order,
             state: self.is_on(),
             id: self.id,
-        };
-        new_zone
+        }
     }
 
     /// Updates the order of this zone
@@ -142,7 +151,7 @@ impl Zone {
     pub fn set_order(&self, order: i8) {
         let mut updated_zone = self.clone();
         updated_zone.system_order = order;
-        self.update_zone(updated_zone);
+        self.update(updated_zone);
     }
 }
 
@@ -151,20 +160,30 @@ impl Clone for Zone {
     fn clone(&self) -> Self {
         Zone {
             name: self.name.clone(),
-            gpio: self.gpio.clone(),
-            time: self.time.clone(),
-            enabled: self.enabled.clone(),
-            auto_off: self.auto_off.clone(),
-            system_order: self.system_order.clone(),
-            id: self.id.clone(),
+            gpio: self.gpio,
+            time: self.time,
+            enabled: self.enabled,
+            auto_off: self.auto_off,
+            system_order: self.system_order,
+            id: self.id,
         }
     }
 }
-
+/// Formats the zone to be displayed as
+/// `name | gpio | time | auto_off | enabled | system_order | id`
 impl fmt::Display for Zone {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        //NOTE: Dear god why did I think this was a good format.
-        write!(f, "{} | {} | {} | {} | {} | {} | {}", self.name, self.gpio, self.time, self.enabled, self.auto_off, self.system_order, self.id)
+        write!(
+            f,
+            "{} | {} | {} | {} | {} | {} | {}",
+            self.name,
+            self.gpio,
+            self.time,
+            self.enabled,
+            self.auto_off,
+            self.system_order,
+            self.id
+        )
     }
 }
 
@@ -172,13 +191,13 @@ impl fmt::Display for Zone {
 impl From<Row> for Zone {
     fn from(row: Row) -> Self {
         Zone {
-            name: row.get(0).unwrap(),
-            gpio: row.get(1).unwrap(),
-            time: row.get(2).unwrap(),
-            enabled: row.get(3).unwrap(),
-            auto_off: row.get(4).unwrap(),
-            system_order: row.get(5).unwrap(),
-            id: row.get(6).unwrap(),
+            name: row.get("Name").unwrap(),
+            gpio: row.get("GPIO").unwrap(),
+            time: row.get("Time").unwrap(),
+            enabled: row.get("Enabled").unwrap(),
+            auto_off: row.get("AutoOff").unwrap(),
+            system_order: row.get("SystemOrder").unwrap(),
+            id: row.get("ID").unwrap(),
         }
     }
 }
@@ -232,6 +251,7 @@ pub struct ZoneWithState {
     pub id: i8,
 }
 
+/// Used for reordering zones.
 #[derive(Clone)]
 pub struct ZoneList {
     pub zones: Vec<Zone>,
@@ -242,21 +262,60 @@ pub struct ZoneList {
 ///     * `zone_id` The id of the zone we want to get
 /// # Return
 ///     * `Zone` The zone that corresponds to the given id.
-pub fn get_zone_from_order(zone_order: i8) -> Zone {
-    let pool = get_pool();
-    let mut conn = pool.get_conn().unwrap();
-    let query = format!("SELECT Name, Gpio, Time, Enabled, AutoOff, SystemOrder, ID from Zones WHERE SystemOrder={}", zone_order);
+pub fn get_zone_from_id(zone_id: i8) -> Zone {
+    let query = format!("SELECT Name,GPIO,Time,Enabled,AutoOff,SystemOrder,ID FROM Zones WHERE ID = {}", zone_id);
+
+    let mut rows = get_pool().prep_exec(query,()).unwrap();
+    // let mut rows = stmt.prep+((zone_id,)).unwrap();
+    // Get the first row in rows
     if get_settings().verbose {
-        println!("{}", query);
+        println!("Getting row from id: {}", zone_id);
     }
-    let rows = conn.query(query).unwrap();
+
     let mut _zone = Zone::default();
-    for row in rows {
-        let _row = row.unwrap();
-        _zone = Zone::from(_row);
+    if !rows.more_results_exists() {
+        if get_settings().verbose {
+            println!("Default zone on get_zone_from_id: {}", zone_id);
+            println!("SELECT * FROM Zones WHERE id = {}",zone_id);
+        }
         return _zone;
     }
-    return _zone;
+    let row = rows.next().unwrap().unwrap();
+    _zone = Zone::from(row);
+    if get_settings().verbose {
+        println!("{:?}", _zone);
+    }
+    _zone
+}
+
+/// Gets a zone from the given id
+/// # Params
+///     * `zone_id` The id of the zone we want to get
+/// # Return
+///     * `Zone` The zone that corresponds to the given id.
+pub fn get_zone_from_order(zone_order: i8) -> Zone {
+    let query = format!("SELECT Name,GPIO,Time,Enabled,AutoOff,SystemOrder,ID FROM Zones WHERE SystemOrder = {}", zone_order);
+
+    let mut rows = get_pool().prep_exec(query,()).unwrap();
+    // let mut rows = stmt.prep+((zone_id,)).unwrap();
+    // Get the first row in rows
+    if get_settings().verbose {
+        println!("Getting row from system order: {}", zone_order);
+    }
+
+    let mut _zone = Zone::default();
+    if !rows.more_results_exists() {
+        if get_settings().verbose {
+            println!("Default zone on get_zone_from_order: {}", zone_order);
+        }
+        return _zone;
+    }
+    let row = rows.next().unwrap().unwrap();
+    _zone = Zone::from(row);
+    if get_settings().verbose {
+        println!("{:?}", _zone);
+    }
+    _zone
 }
 
 /// Deletes the given zone
@@ -266,11 +325,11 @@ pub fn get_zone_from_order(zone_order: i8) -> Zone {
 ///     * a bool representing if the deletion was successful (true) or not (false)
 pub fn delete_zone(_zone: ZoneDelete) -> bool {
     let pool = get_pool();
-    let query = format!("DELETE FROM `Zones` WHERE id = {}", _zone.id);
+    let query = "DELETE FROM `Zones` WHERE id = ?";
     if get_settings().verbose {
         println!("{}", query);
     }
-    let result = match pool.prep_exec(query, ()) {
+    let result = match pool.prep_exec(query, (_zone.id,)) {
         Ok(..) => true,
         Err(..) => {
             if get_settings().verbose {
@@ -290,12 +349,22 @@ pub fn delete_zone(_zone: ZoneDelete) -> bool {
 ///     * A bool representing whether or not the insert was successful (true) or failed (false)
 pub fn add_new_zone(_zone: ZoneAdd) -> bool {
     let pool = get_pool();
-    let query = format!("INSERT into `Zones` (`Name`, `Gpio`, `Time`, `AutoOff`, `Enabled`) VALUES \
-     ( '{}','{}','{}',{},{} )", _zone.name, _zone.gpio, _zone.time, _zone.auto_off, _zone.enabled);
+    let query =
+        "INSERT into `Zones` (`Name`, `Gpio`, `Time`, `AutoOff`, `Enabled`) VALUES ( ?,?,?,?,? )";
+
     if get_settings().verbose {
         println!("{}", query);
     }
-    let result = match pool.prep_exec(query, ()) {
+    let result = match pool.prep_exec(
+        query,
+        (
+            _zone.name,
+            _zone.gpio,
+            _zone.time,
+            _zone.auto_off,
+            _zone.enabled,
+        ),
+    ) {
         Ok(..) => true,
         Err(e) => {
             if get_settings().verbose {

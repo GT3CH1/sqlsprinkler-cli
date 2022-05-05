@@ -1,5 +1,5 @@
 UNAME := $(shell uname -m)
-VERSION := 0.1-5
+VERSION := 0.1-6
 ROOT := sqlsprinkler_$(VERSION)_$(ARCH)
 default:
 	$(MAKE) build
@@ -7,10 +7,14 @@ default:
 check:
 	@echo "Checking for armv7l on" $(UNAME)
     ifeq ($(UNAME), x86_64)
-	    @cross check --target armv7-unknown-linux-gnueabihf
+	    @cross clippy --target armv7-unknown-linux-gnueabihf
     else
-		cargo check
+		cargo clippy
     endif
+
+fmt:
+	@echo "Formatting"
+	cargo fmt
 
 build:
 	@echo "Building for arm on" $(UNAME)
@@ -30,8 +34,9 @@ install: deb
 	dpkg -i $(ROOT).deb
 
 clean:
-	rm *.deb
-	rm -rf ./$(ROOT)/
+	-rm *.deb
+	-rm -rf ./$(ROOT)/
+	cargo clean
 
 deb: build-arm
 	@install -dm755 $(ROOT)
