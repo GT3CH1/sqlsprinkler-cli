@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 use std::thread;
 use std::time::Duration;
+use paho_mqtt::{AsyncClient, Message};
 
 lazy_static! {
     // create a hashmap of topics and zone
@@ -73,47 +74,52 @@ pub fn mqtt_run() -> ! {
             check_system_command_topic(topic, payload_str);
         }
     });
-
+    let mut loop_count = 0;
     loop {
         thread::sleep(Duration::from_millis(5000));
         // Send current status of all zones
         for zone in get_zones().zones {
             // send current status
-            let mut topic = format!("sqlsprinkler_zone_{}/status", zone.id);
+            let mut topic = format!("sqlsprinkler_zone_{}/status", zone.id).as_str();
             let mut payload = if zone.get_with_state().state {
                 "ON"
             } else {
                 "OFF"
             };
-            let mut msg = mqtt::Message::new(topic, payload, 0);
-            mqtt_client.publish(msg);
+            send_payload(&mqtt_client, &topic, &payload);
 
             // send current time
-            topic = format!("sqlsprinkler_zone_{}_time/status", zone.id);
+            topic = format!("sqlsprinkler_zone_{}_time/status", zone.id).as_str();
             // Set payload to zone.time
             let tmp_payload = format!("{}", zone.time);
             payload = tmp_payload.as_str();
-            msg = mqtt::Message::new(topic, payload, 0);
-            mqtt_client.publish(msg);
+            send_payload(&mqtt_client, &topic, &payload);
 
             // send current auto off state
-            topic = format!("sqlsprinkler_zone_{}_auto_off_state/status", zone.id);
+            topic = format!("sqlsprinkler_zone_{}_auto_off_state/status", zone.id).as_str();
             payload = if zone.auto_off { "ON" } else { "OFF" };
-            msg = mqtt::Message::new(topic, payload, 0);
-            mqtt_client.publish(msg);
+            send_payload(&mqtt_client, &topic, &payload);
 
             // send current enabled state
-            topic = format!("sqlsprinkler_zone_{}_enabled_state/status", zone.id);
+            topic = format!("sqlsprinkler_zone_{}_enabled_state/status", zone.id).as_str();
             payload = if zone.enabled { "ON" } else { "OFF" };
-            msg = mqtt::Message::new(topic, payload, 0);
-            mqtt_client.publish(msg);
+            send_payload(&mqtt_client, &topic, &payload);
         }
         // send current status of the system switch
-        let topic = "sqlsprinkler_system/status";
+        let mut topic = "sqlsprinkler_system/status";
         let payload = if get_system_status() { "ON" } else { "OFF" };
-        let msg = mqtt::Message::new(topic, payload, 0);
-        mqtt_client.publish(msg);
+        send_payload(&mqtt_client, topic, payload);
+
+        loop_count = (loop_count + 1) % 15;
+        if loop_count == 0 {
+            // broadcast
+            send_discovery_message(&mqtt_client);
+        }
     }
+}
+
+fn send_payload(mqtt_client: &AsyncClient, topic: &str, payload: &str) {
+    mqtt_client.publish(Message::new(topic, payload, 0));
 }
 
 /// Checks if the topic is eqal to the system command topic - sqlsprinkler_system/command
@@ -145,7 +151,7 @@ fn check_msg_topic(topic: &str, payload_str: &str, zone: &Zone) {
 /// * `zone` - The sprinkler zone to check
 fn check_msg_enabled_state(topic: &str, payload_str: &str, zone: &Zone) {
     if topic == format!("sqlsprinkler_zone_{}_enabled_state/command", zone.id) {
-        let enabled_state = payload_str.parse::<bool>().unwrap();
+        let enabled_state = payload_str == "ON";
         let mut new_zone = zone.clone();
         new_zone.enabled = enabled_state;
         zone.update(new_zone);
@@ -159,7 +165,7 @@ fn check_msg_enabled_state(topic: &str, payload_str: &str, zone: &Zone) {
 /// * `zone` - The sprinkler zone to check
 fn check_msg_autooff(topic: &str, payload_str: &str, zone: &Zone) {
     if topic == format!("sqlsprinkler_zone_{}_auto_off_state/command", zone.id) {
-        let auto_off_state = payload_str.parse::<bool>().unwrap();
+        let auto_off_state = payload_str == "ON";
         let mut new_zone = zone.clone();
         new_zone.auto_off = auto_off_state;
         zone.update(new_zone);
@@ -199,9 +205,18 @@ fn check_msg_zone(topic: &str, payload_str: &str, zone: &Zone) {
 /// # Arguments
 /// * `cli` - The MQTT client
 /// * `_msgid` - The message ID (unused)
-fn on_connect_success(cli: &mqtt::AsyncClient, _msgid: u16) {
+fn on_connect_success(cli: &AsyncClient, _msgid: u16) {
     println!("Connection succeeded");
+    send_discovery_message(cli);
+    // Subscribe to all zone topics
+    for zone in ZONES.read().unwrap().keys() {
+        cli.subscribe(zone, 0);
+        println!("Subscribed to {}", zone);
+    }
+}
 
+/// Sends the discovery message of all of the entities to the MQTT broker.
+fn send_discovery_message(cli: &AsyncClient) {
     //broadcast all of the zones.
     for zone in get_zones().zones {
         // Broadcast the zone discovery message to the MQTT broker (as a switch)
@@ -270,11 +285,6 @@ fn on_connect_success(cli: &mqtt::AsyncClient, _msgid: u16) {
     ZONES.write().unwrap().insert(system.cmd_t, Zone::default());
     println!("Sending MQTT message: {}", payload);
     cli.publish(msg);
-    // Subscribe to all zone topics
-    for zone in ZONES.read().unwrap().keys() {
-        cli.subscribe(zone, 0);
-        println!("Subscribed to {}", zone);
-    }
 }
 
 /// Callback for a failed attempt to connect to the server.
