@@ -1,4 +1,3 @@
-use crate::get_settings;
 use crate::sqlsprinkler::get_pool;
 use log::{debug, error, info};
 use mysql::{params, Row};
@@ -8,7 +7,7 @@ use std::convert::From;
 use std::{fmt, thread, time};
 
 /// Represents a SQLSprinkler zone.
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default)]
 pub struct Zone {
     pub name: String,
     pub gpio: u8,
@@ -426,19 +425,4 @@ pub fn add(_zone: ZoneAdd) -> bool {
         info!("Zone created!");
     }
     result
-}
-
-/// Creates a default zone.
-impl Default for Zone {
-    fn default() -> Zone {
-        Zone {
-            name: "".to_string(),
-            gpio: 0,
-            time: 0,
-            enabled: false,
-            auto_off: false,
-            system_order: 0,
-            id: 0,
-        }
-    }
 }
