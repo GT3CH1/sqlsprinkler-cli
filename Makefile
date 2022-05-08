@@ -12,6 +12,14 @@ check:
 		cargo clippy
     endif
 
+test:
+	@echo "Checking for armv7l on" $(UNAME)
+    ifeq ($(UNAME), x86_64)
+	    @cross test --target armv7-unknown-linux-gnueabihf
+    else
+		cargo test
+    endif
+
 fmt:
 	@echo "Formatting"
 	cargo fmt

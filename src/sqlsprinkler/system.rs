@@ -1,5 +1,6 @@
 use crate::get_settings;
 use crate::sqlsprinkler::{get_pool, zone};
+use log::info;
 use std::{thread, time};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -9,9 +10,12 @@ pub struct SysStatus {
 
 /// Enables or disables the system schedule
 /// # Arguments
-///     * `pool` The SQL connection pool
-/// used to toggle the system.
 ///     * `enabled` If true is passed in, the system is enabled. If false is used, the system is disabled.
+/// # Example
+/// ```
+/// use sqlsprinkler::system::set_status;
+/// set_status(true);
+/// ```
 pub fn set_system_status(enabled: bool) {
     let pool = get_pool();
     let query = "UPDATE Enabled set enabled = ?";
@@ -19,10 +23,13 @@ pub fn set_system_status(enabled: bool) {
 }
 
 /// Gets whether the system schedule is enabled or disabled
-/// # Arguments
-///     * `pool` The SQL connection pool used to toggle the system.
 /// # Return
-///     * `bool` True if the system is enabled, false if not.
+/// A bool representing whether the system is enabled or disabled.
+/// # Example
+/// ```
+/// use sqlsprinkler::system::get_system_status;
+/// let status = get_system_status();
+/// ```
 pub(crate) fn get_system_status() -> bool {
     let pool = get_pool();
     let query = "SELECT enabled FROM Enabled";
@@ -42,10 +49,13 @@ pub(crate) fn get_system_status() -> bool {
 }
 
 /// Gets a list of all the zones in this database
-/// # Arguments
-///     * `pool` The SQL connection pool to use to query for zones
 /// # Returns
-///     * `Vec<Zone>` A list of all the zones in the database.
+///     A `ZoneList` containing all the zones ordered by their system order.
+/// # Example
+/// ```
+/// use sqlsprinkler::system;
+/// let zones = system::get_zones();
+/// ```
 pub(crate) fn get_zones() -> zone::ZoneList {
     let pool = get_pool();
     let mut conn = pool.get_conn().unwrap();
@@ -54,17 +64,19 @@ pub(crate) fn get_zones() -> zone::ZoneList {
     let mut zone_list: Vec<zone::Zone> = vec![];
     for row in rows {
         let _row = row.unwrap();
-
         let zone = zone::Zone::from(_row);
         zone_list.push(zone.clone());
-        if get_settings().verbose {
-            println!("{}", zone);
-        }
     }
+    info!("Got {} zones", zone_list.len());
     zone::ZoneList { zones: zone_list }
 }
 
 /// Runs the system based on the schedule configured. Skips over any zones that are not enabled in the database.
+/// # Example
+/// ```
+/// use sqlsprinkler::system;
+/// system::run_system();
+/// ```
 pub fn run() {
     let zone_list = get_zones();
     for zone in &zone_list.zones {
@@ -76,7 +88,13 @@ pub fn run() {
 }
 
 /// Turns off all the zones in the system
+/// # Example
+/// ```
+/// use sqlsprinkler::system;
+/// system::turn_off_all_zones();
+/// ```
 pub(crate) fn turn_off_all_zones() {
+    info!("Turning off all zones");
     let zone_list = get_zones();
     for zone_in_list in &zone_list.zones {
         zone_in_list.turn_off();
@@ -84,6 +102,11 @@ pub(crate) fn turn_off_all_zones() {
 }
 
 /// Winterizes the system by turning on a zone for a minute, followed by a three minute delay.
+/// # Example
+/// ```
+/// use sqlsprinkler::system;
+/// system::winterize();
+/// ```
 pub(crate) fn winterize() {
     let zone_list = get_zones();
     for zone in &zone_list.zones {

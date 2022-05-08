@@ -1,6 +1,7 @@
 use crate::sqlsprinkler::zone::{get_zone_from_order, ZoneOrder};
 use crate::sqlsprinkler::{system, zone, zone::get_zone_from_id};
 use crate::{get_system_status, set_system_status, sqlsprinkler, turn_off_all_zones};
+use log::info;
 use serde::{Deserialize, Serialize};
 use warp::{http, reject, Filter};
 
@@ -17,6 +18,7 @@ impl reject::Reject for LengthMismatch {}
 #[tokio::main]
 /// Main function for the daemon.
 pub(crate) async fn run() {
+    info!("Starting daemon");
     // Handle get requests to /system/state -> Used to get the current state of the sys schedule
     let get_sys_status = warp::get()
         .and(warp::path("system"))
@@ -84,6 +86,7 @@ pub(crate) async fn run() {
         .or(delete_zone)
         .or(update_zone)
         .or(update_order);
+    info!("Daemon started on port 3030");
     warp::serve(routes).run(([0, 0, 0, 0], 3030)).await;
 }
 
@@ -176,7 +179,7 @@ async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, wa
 /// # Params
 ///     * `_zone` The new zone we are wanting to add to the system.
 async fn _add_zone(_zone: zone::ZoneAdd) -> Result<impl warp::Reply, warp::Rejection> {
-    zone::add_new_zone(_zone);
+    zone::add(_zone);
     Ok(warp::reply::with_status(
         "Adding zone",
         http::StatusCode::CREATED,
@@ -187,7 +190,7 @@ async fn _add_zone(_zone: zone::ZoneAdd) -> Result<impl warp::Reply, warp::Rejec
 /// # Params
 ///     * `_zone` The zone we are wanting to delete.
 async fn _delete_zone(_zone: zone::ZoneDelete) -> Result<impl warp::Reply, warp::Rejection> {
-    zone::delete_zone(_zone);
+    zone::delete(_zone);
     Ok(warp::reply::with_status(
         "Deleted zone",
         http::StatusCode::OK,

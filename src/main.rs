@@ -1,30 +1,39 @@
 // Copyright 2021 Gavin Pease
 
+extern crate core;
+
 mod config;
 mod mqtt;
 mod sqlsprinkler;
-
-use mysql::serde_json;
-use std::fmt::Debug;
-use std::process::exit;
-use std::str::FromStr;
-
-use structopt::StructOpt;
 
 use crate::config::{get_settings, read_settings};
 use crate::sqlsprinkler::system::{
     get_system_status, get_zones, set_system_status, turn_off_all_zones, winterize,
 };
 use crate::sqlsprinkler::zone::Zone;
+use chrono::Local;
+use env_logger::fmt::Color;
+use env_logger::{Builder, Env};
+use log::{error, info, warn};
+use mysql::serde_json;
 use sqlsprinkler::daemon;
+use std::fmt::Debug;
+use std::io::Write;
+use std::process::exit;
+use std::str::FromStr;
+use structopt::StructOpt;
 
 /// Holds the program's possible CLI options.
 #[derive(Debug, StructOpt)]
 #[structopt(name = "sqlsprinkler", about = "SQLSprinkler")]
 pub struct Opts {
     /// Whether or not to print the version of the program
-    #[structopt(short = "v", about = "Prints the version of SQLSprinkler.")]
+    #[structopt(short = "V", about = "Prints the version of SQLSprinkler.")]
     version_mode: bool,
+
+    /// Whether or not to use verbose output
+    #[structopt(short = "v", long = "verbose", about = "Verbose mode")]
+    verbose_mode: bool,
 
     /// Whether or not to run in daemon mode
     #[structopt(
@@ -114,19 +123,38 @@ enum SysOpts {
 /// Main entry point for the SQLSprinkler program.
 fn main() {
     let cli = Opts::from_args();
-    println!("{:?}", cli);
 
     let daemon_mode = cli.daemon_mode;
     let version_mode = cli.version_mode;
     let home_assistant = cli.home_assistant;
+    let verbose_mode = cli.verbose_mode;
 
     match read_settings() {
         Ok(..) => (),
         Err(e) => {
-            println!("An error occurred while reading the config file: {}", e);
+            error!("An error occurred while reading the config file: {}", e);
             exit(1)
         }
     };
+
+    if verbose_mode || get_settings().verbose {
+        // Set the verbose mode for env_logger.
+        Builder::from_env(Env::default().default_filter_or("info")).init();
+    } else {
+        Builder::from_env(Env::default().default_filter_or("warn"))
+            .format(|buf, record| {
+                let mut style = buf.style();
+                style.set_bg(Color::White).set_bold(true);
+                writeln!(
+                    buf,
+                    "{} [{}] - {}",
+                    Local::now().format("%Y-%m-%dT%H:%M:%S"),
+                    record.level(),
+                    record.args()
+                )
+            })
+            .init();
+    }
 
     if version_mode {
         println!("SQLSprinkler v{}", env!("CARGO_PKG_VERSION"));
@@ -134,11 +162,13 @@ fn main() {
     }
 
     if daemon_mode {
+        info!("Starting SQLSprinkler daemon...");
         turn_off_all_zones();
         daemon::run();
     }
 
     if home_assistant {
+        info!("Starting home assistant/mqtt integration...");
         mqtt::mqtt_client::mqtt_run();
     }
 
@@ -153,7 +183,8 @@ fn main() {
                     Some(z) => z,
                     None => {
                         // Return the default zone.
-                        panic!("Zone {} not found.", id);
+                        error!("Zone {} not found.", id);
+                        panic!()
                     }
                 };
                 match zone_state.state.parse().unwrap() {
@@ -180,32 +211,25 @@ fn main() {
             // `sqlsprinkler sys ...`
             Cli::Sys(sys_opts) => match sys_opts {
                 SysOpts::On => {
-                    if get_settings().verbose {
-                        println!("Enabled system schedule");
-                    }
+                    info!("Enabled system schedule");
                     set_system_status(true);
                 }
                 SysOpts::Off => {
-                    if get_settings().verbose {
-                        println!("Disabling system schedule.");
-                    }
+                    info!("Disabling system schedule.");
+
                     set_system_status(false);
                 }
                 SysOpts::Run => {
                     if get_system_status() {
-                        if get_settings().verbose {
-                            println!("Running the system schedule.");
-                        }
+                        info!("Running the system schedule.");
                         sqlsprinkler::system::run();
-                    } else if get_settings().verbose {
-                        println!("System is not enabled, refusing.");
+                    } else {
+                        warn!("System is not enabled, refusing.");
                     }
                 }
                 SysOpts::Winterize => {
-                    if get_settings().verbose {
-                        println!("Winterizing the system.");
-                        winterize();
-                    }
+                    info!("Winterizing the system.");
+                    winterize();
                 }
                 SysOpts::Status => {
                     let system_status = get_system_status();

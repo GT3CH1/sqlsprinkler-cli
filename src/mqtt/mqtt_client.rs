@@ -4,13 +4,14 @@ use crate::{
     Zone,
 };
 use lazy_static::lazy_static;
+use log::info;
 use paho_mqtt as mqtt;
+use paho_mqtt::{AsyncClient, Message};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::thread;
 use std::time::Duration;
-use paho_mqtt::{AsyncClient, Message};
 
 lazy_static! {
     // create a hashmap of topics and zone
@@ -18,7 +19,7 @@ lazy_static! {
 }
 
 /// Runs the MQTT client for the sprinkler system.
-/// Connects to the MQTT broker given in the settings, and authenticates with the username and password.
+/// Connects to the MQTT broker given in the settings, and authenticates with the username and password (also pulled from settings).
 /// Then, it will publish a auto discovery message for home assistant, followed by the current state of the system.
 /// Finally, it will subscribe to the following topics:
 ///    - `sqlsprinkelr_zone_<zone_id>/command`: will subscribe to the topic for turning on/off a zone.
@@ -32,29 +33,35 @@ lazy_static! {
 ///    - `sqlsprinkler_zone_<zone_id>_timer/state`: will publish the current timer for a zone.
 ///    - `sqlsprinkliner_zone_<zone_id>_auto_off_state/state`: will publish the current auto off state for a zone.
 ///    - `sqlsprinkler_zone_<zone_id>_enabled/state`: will publish the current enabled state for a zone.
+/// # Examples
+/// ```
+/// use sqlsprinkler::mqtt::mqtt_client;
+/// mqtt_client::run();
+/// ```
 pub fn mqtt_run() -> ! {
     let mqtt_host = get_settings().mqtt_host;
     let mqtt_user = get_settings().mqtt_user;
     let mqtt_pass = get_settings().mqtt_pass;
 
     // create the mqtt client
-    let mqtt_client = mqtt::AsyncClient::new(mqtt_host).unwrap();
+    let mqtt_client = AsyncClient::new(mqtt_host).unwrap();
     let opts = mqtt::ConnectOptionsBuilder::new()
         .user_name(mqtt_user)
         .password(mqtt_pass)
         .finalize();
 
+    info!("Connecting to MQTT broker...");
     mqtt_client.connect_with_callbacks(opts, on_connect_success, on_connect_failure);
 
     // Set a closure to be called whenever the client connection is established.
-    mqtt_client.set_connected_callback(|_cli: &mqtt::AsyncClient| {
+    mqtt_client.set_connected_callback(|_cli: &AsyncClient| {
         println!("Connected.");
     });
 
     // Set a closure to be called whenever the client loses the connection.
     // It will attempt to reconnect, and set up function callbacks to keep
     // retrying until the connection is re-established.
-    mqtt_client.set_connection_lost_callback(|cli: &mqtt::AsyncClient| {
+    mqtt_client.set_connection_lost_callback(|cli: &AsyncClient| {
         println!("Connection lost. Attempting reconnect.");
         thread::sleep(Duration::from_millis(2500));
         cli.reconnect_with_callbacks(on_connect_success, on_connect_failure);
@@ -65,48 +72,47 @@ pub fn mqtt_run() -> ! {
         if let Some(msg) = msg {
             let topic = msg.topic();
             let payload_str = msg.payload_str();
-            println!("{} - {}", topic, payload_str);
-            // Iterate through the zones and turn on the zones that match the topic
+            info!("{} - {}", topic, payload_str);
             for zone in ZONES.read().unwrap().iter() {
                 check_msg_topic(topic, &payload_str, zone.1);
             }
-            // Check if topic is sqlsprinkler_system/command
             check_system_command_topic(topic, payload_str);
         }
     });
+
     let mut loop_count = 0;
     loop {
         thread::sleep(Duration::from_millis(5000));
         // Send current status of all zones
         for zone in get_zones().zones {
             // send current status
-            let mut topic = format!("sqlsprinkler_zone_{}/status", zone.id).as_str();
+            let mut topic = format!("sqlsprinkler_zone_{}/status", zone.id);
             let mut payload = if zone.get_with_state().state {
                 "ON"
             } else {
                 "OFF"
             };
-            send_payload(&mqtt_client, &topic, &payload);
+            send_payload(&mqtt_client, &topic, payload);
 
             // send current time
-            topic = format!("sqlsprinkler_zone_{}_time/status", zone.id).as_str();
+            topic = format!("sqlsprinkler_zone_{}_time/status", zone.id);
             // Set payload to zone.time
             let tmp_payload = format!("{}", zone.time);
             payload = tmp_payload.as_str();
-            send_payload(&mqtt_client, &topic, &payload);
+            send_payload(&mqtt_client, &topic, payload);
 
             // send current auto off state
-            topic = format!("sqlsprinkler_zone_{}_auto_off_state/status", zone.id).as_str();
+            topic = format!("sqlsprinkler_zone_{}_auto_off_state/status", zone.id);
             payload = if zone.auto_off { "ON" } else { "OFF" };
-            send_payload(&mqtt_client, &topic, &payload);
+            send_payload(&mqtt_client, &topic, payload);
 
             // send current enabled state
-            topic = format!("sqlsprinkler_zone_{}_enabled_state/status", zone.id).as_str();
+            topic = format!("sqlsprinkler_zone_{}_enabled_state/status", zone.id);
             payload = if zone.enabled { "ON" } else { "OFF" };
-            send_payload(&mqtt_client, &topic, &payload);
+            send_payload(&mqtt_client, &topic, payload);
         }
         // send current status of the system switch
-        let mut topic = "sqlsprinkler_system/status";
+        let topic = "sqlsprinkler_system/status";
         let payload = if get_system_status() { "ON" } else { "OFF" };
         send_payload(&mqtt_client, topic, payload);
 

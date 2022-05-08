@@ -1,3 +1,4 @@
+use log::error;
 use std::process::exit;
 
 use mysql::Pool;
@@ -11,9 +12,34 @@ pub mod zone;
 /// Gets a connection to a MySQL database
 /// # Return
 ///     `Pool` A connection to the SQL database.
+///
 pub(crate) fn get_pool() -> Pool {
     // Build the url for the connection
     let reader = get_settings();
+
+    if reader.sqlsprinkler_user.is_empty() {
+        error!(
+            "Missing configuration for sqlsprinkler_user in /etc/sqlsprinkler/sqlsprinkler.conf"
+        );
+        exit(1);
+    }
+    if reader.sqlsprinkler_pass.is_empty() {
+        error!(
+            "Missing configuration for sqlsprinkler_pass in /etc/sqlsprinkler/sqlsprinkler.conf"
+        );
+        exit(1);
+    }
+    if reader.sqlsprinkler_host.is_empty() {
+        error!(
+            "Missing configuration for sqlsprinkler_host in /etc/sqlsprinkler/sqlsprinkler.conf"
+        );
+        exit(1);
+    }
+    if reader.sqlsprinkler_db.is_empty() {
+        error!("Missing configuration for sqlsprinkler_db in /etc/sqlsprinkler/sqlsprinkler.conf");
+        exit(1);
+    }
+
     let url = format!(
         "mysql://{}:{}@{}:3306/{}",
         reader.sqlsprinkler_user,
@@ -24,7 +50,7 @@ pub(crate) fn get_pool() -> Pool {
     let pool = match Pool::new(url) {
         Ok(p) => p,
         Err(_e) => {
-            println!("Could not connect! Did you set the username/password correctly?");
+            error!("Could not connect! Did you set the username/password correctly?");
             exit(1);
         }
     };

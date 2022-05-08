@@ -1,5 +1,6 @@
 use crate::get_settings;
 use crate::sqlsprinkler::get_pool;
+use log::{debug, error, info};
 use mysql::{params, Row};
 use rppal::gpio::{Gpio, OutputPin};
 use serde::{Deserialize, Serialize};
@@ -7,7 +8,7 @@ use std::convert::From;
 use std::{fmt, thread, time};
 
 /// Represents a SQLSprinkler zone.
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 pub struct Zone {
     pub name: String,
     pub gpio: u8,
@@ -18,49 +19,68 @@ pub struct Zone {
     pub id: i8,
 }
 
-// - turn_on -> Allows user to turn on this zone
-// - turn_off -> Turns off this zone.
-// - get_name -> Gets the name for this zone
-// - run_zone -> Runs the zone based off its configuration.
-// - update_zone -> Updates the zone to a new zone.
-// - is_on -> Whether or not this zone is currently active.
-// - get_zone_with_state -> Returns the zone, but with the `state` parameter as well (ZoneWithState)
-// - set_order -> Sets the system ordering for the zone.
 impl Zone {
     /// Gets the gpio interface for this zone.
     /// # Return
     ///     `gpio` An OutputPin that we can use to turn the zone on or off
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::zone::Zone;
+    /// let zone = Zone::default();
+    /// let gpio = zone.get_gpio();
+    /// ```
     pub(self) fn get_gpio(&self) -> OutputPin {
         let mut pin = Gpio::new().unwrap().get(self.gpio).unwrap().into_output();
+
         // tl;dr without this line, pins get reset immediately.
         pin.set_reset_on_drop(false);
         pin
     }
+
     /// Turns on this zone.
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::zone::Zone;
+    /// let zone = Zone::default();
+    /// zone.turn_on();
+    /// ```
     pub fn turn_on(&self) {
-        if get_settings().verbose {
-            println!("Turned on {}", self);
-        }
-        // Check if mqtt is enabled
+        info!("Turned on {}", self);
         let mut gpio = self.get_gpio();
         gpio.set_low();
     }
 
     /// Turns off this zone.
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::zone::Zone;
+    /// let zone = Zone::default();
+    /// zone.turn_off();
+    /// ```
     pub fn turn_off(&self) {
         let mut gpio = self.get_gpio();
-        if get_settings().verbose {
-            println!("Turned off {}", self);
-        }
+        info!("Turned off {}", self);
         gpio.set_high();
     }
 
     /// Gets the name of this zone
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::zone::Zone;
+    /// let zone = Zone::default();
+    /// let name = zone.get_name();
+    /// ```
     pub(self) fn get_name(&self) -> String {
         self.clone().name
     }
 
     /// Gets whether or not this zone is on
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::zone::Zone;
+    /// let zone = Zone::default();
+    /// let is_on = zone.is_on();
+    /// ```
     /// # Return
     ///     `on` A bool representing whether or not this zone is on.
     pub(self) fn is_on(&self) -> bool {
@@ -69,10 +89,14 @@ impl Zone {
     }
 
     /// Turns the zone on for 12 seconds and then turn off.
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::zone::Zone;
+    /// let zone = Zone::default();
+    /// zone.test();
+    /// ```
     pub fn test(&self) {
-        if get_settings().verbose {
-            println!("Testing {}", self.name)
-        }
+        info!("Testing {}", self.name);
         self.turn_on();
         let run_time = time::Duration::from_secs(12);
         thread::sleep(run_time);
@@ -81,6 +105,12 @@ impl Zone {
 
     /// Runs this zone, and automatically turn it off if launched from another thread and if
     /// `auto_off` is set to true for this zone. Will run for `time` minutes
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::zone::Zone;
+    /// let zone = Zone::default();
+    /// zone.run_async();
+    /// ```
     pub fn run_async(&self) {
         self.turn_on();
         if self.auto_off {
@@ -95,6 +125,12 @@ impl Zone {
     }
 
     /// Runs this zone in a blocking fashion.
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::zone::Zone;
+    /// let zone = Zone::default();
+    /// zone.run();
+    /// ```
     pub fn run(&self) {
         self.turn_on();
         let _zone = self.clone();
@@ -105,9 +141,17 @@ impl Zone {
 
     /// Updates this zone to the given `zone` parameter.
     /// # Params
-    ///     * `zone` A zone struct representing the new values for this zone.
+    ///     `zone` The zone to update to.
     /// # Return
-    ///     * `ok` A bool representing whether or not the update was successful
+    ///     `true` if the zone was updated, `false` otherwise.
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::zone::Zone;
+    /// let zone = Zone::default();
+    /// let mut new_zone = zone.clone();
+    /// new_zone.name = "New Name".to_string();
+    /// zone.update(new_zone);
+    /// ```
     pub fn update(&self, zone: Zone) -> bool {
         let query = get_pool().prepare("UPDATE Zones SET Name=:name, Gpio=:gpio, Time=:time, AutoOff=:autooff,Enabled=:enabled,SystemOrder=:so WHERE ID=:id").into_iter();
         let mut updated: bool = false;
@@ -132,6 +176,12 @@ impl Zone {
     /// Gets a representation of this zone, but also with `is_on` as bool `state`
     /// # Return
     /// `zone_with_state` A ZoneWithState struct representing this zone and its current state.
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::zone::Zone;
+    /// let zone = Zone::default();
+    /// let zone_with_state = zone.get_with_state();
+    /// ```
     pub fn get_with_state(&self) -> ZoneWithState {
         ZoneWithState {
             name: self.get_name(),
@@ -148,6 +198,12 @@ impl Zone {
     /// Updates the order of this zone
     /// # Params
     ///     `order` An i8 representing the new ordering of this zone.
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::zone::Zone;
+    /// let zone = Zone::default();
+    /// zone.set_order(1);
+    /// ```
     pub fn set_order(&self, order: i8) {
         let mut updated_zone = self.clone();
         updated_zone.system_order = order;
@@ -155,20 +211,6 @@ impl Zone {
     }
 }
 
-/// Clone this zone.
-impl Clone for Zone {
-    fn clone(&self) -> Self {
-        Zone {
-            name: self.name.clone(),
-            gpio: self.gpio,
-            time: self.time,
-            enabled: self.enabled,
-            auto_off: self.auto_off,
-            system_order: self.system_order,
-            id: self.id,
-        }
-    }
-}
 /// Formats the zone to be displayed as
 /// `name | gpio | time | auto_off | enabled | system_order | id`
 impl fmt::Display for Zone {
@@ -259,102 +301,111 @@ pub struct ZoneList {
 
 /// Gets a zone from the given id
 /// # Params
-///     * `zone_id` The id of the zone we want to get
+///     `zone_id` The id of the zone we want to get
 /// # Return
-///     * `Zone` The zone that corresponds to the given id.
+///     `Zone` The zone that corresponds to the given id.
+/// # Example
+/// ```
+/// use sqlsprinkler::zone::Zone;
+/// let zone = Zone::get_zone(1);
+/// ```
 pub fn get_zone_from_id(zone_id: i8) -> Zone {
-    let query = format!("SELECT Name,GPIO,Time,Enabled,AutoOff,SystemOrder,ID FROM Zones WHERE ID = {}", zone_id);
+    let query = format!(
+        "SELECT Name,GPIO,Time,Enabled,AutoOff,SystemOrder,ID FROM Zones WHERE ID = {}",
+        zone_id
+    );
 
-    let mut rows = get_pool().prep_exec(query,()).unwrap();
+    let mut rows = get_pool().prep_exec(query, ()).unwrap();
     // let mut rows = stmt.prep+((zone_id,)).unwrap();
     // Get the first row in rows
-    if get_settings().verbose {
-        println!("Getting row from id: {}", zone_id);
-    }
+    info!("Getting row from id: {}", zone_id);
 
     let mut _zone = Zone::default();
     if !rows.more_results_exists() {
-        if get_settings().verbose {
-            println!("Default zone on get_zone_from_id: {}", zone_id);
-            println!("SELECT * FROM Zones WHERE id = {}",zone_id);
-        }
+        debug!("Default zone on get_zone_from_id: {}", zone_id);
+        debug!("SELECT * FROM Zones WHERE id = {}", zone_id);
         return _zone;
     }
     let row = rows.next().unwrap().unwrap();
-    _zone = Zone::from(row);
-    if get_settings().verbose {
-        println!("{:?}", _zone);
-    }
-    _zone
+    Zone::from(row)
 }
 
 /// Gets a zone from the given id
 /// # Params
-///     * `zone_id` The id of the zone we want to get
+///     `zone_id` The id of the zone we want to get
 /// # Return
-///     * `Zone` The zone that corresponds to the given id.
+///     `Zone` The zone that corresponds to the given id.
+/// # Example
+/// ```
+/// use sqlsprinkler::zone::Zone;
+/// let zone = Zone::get_zone_from_order(1);
+/// ```
 pub fn get_zone_from_order(zone_order: i8) -> Zone {
-    let query = format!("SELECT Name,GPIO,Time,Enabled,AutoOff,SystemOrder,ID FROM Zones WHERE SystemOrder = {}", zone_order);
+    let query = format!(
+        "SELECT Name,GPIO,Time,Enabled,AutoOff,SystemOrder,ID FROM Zones WHERE SystemOrder = {}",
+        zone_order
+    );
 
-    let mut rows = get_pool().prep_exec(query,()).unwrap();
+    let mut rows = get_pool().prep_exec(query, ()).unwrap();
     // let mut rows = stmt.prep+((zone_id,)).unwrap();
     // Get the first row in rows
-    if get_settings().verbose {
-        println!("Getting row from system order: {}", zone_order);
-    }
+    info!("Getting row from system order: {}", zone_order);
 
     let mut _zone = Zone::default();
     if !rows.more_results_exists() {
-        if get_settings().verbose {
-            println!("Default zone on get_zone_from_order: {}", zone_order);
-        }
+        info!("Default zone on get_zone_from_order: {}", zone_order);
         return _zone;
     }
     let row = rows.next().unwrap().unwrap();
-    _zone = Zone::from(row);
-    if get_settings().verbose {
-        println!("{:?}", _zone);
-    }
-    _zone
+    Zone::from(row)
 }
 
 /// Deletes the given zone
 /// # Params
-///     * `_zone` The zone we are deleting
+///     `_zone` The zone we are deleting
 /// # Return
-///     * a bool representing if the deletion was successful (true) or not (false)
-pub fn delete_zone(_zone: ZoneDelete) -> bool {
+///     a bool representing if the deletion was successful (true) or not (false)
+/// # Example
+/// ```
+/// use sqlsprinkler::zone::Zone;
+/// let zone = Zone::get_zone(1);
+/// zone.delete();
+/// ```
+pub fn delete(_zone: ZoneDelete) -> bool {
     let pool = get_pool();
     let query = "DELETE FROM `Zones` WHERE id = ?";
-    if get_settings().verbose {
-        println!("{}", query);
-    }
     let result = match pool.prep_exec(query, (_zone.id,)) {
         Ok(..) => true,
         Err(..) => {
-            if get_settings().verbose {
-                println!("An error occurred while deleting ")
-            }
+            error!("An error occurred while deleting ");
             false
         }
     };
+    if result {
+        info!("Zone deleted!");
+    }
     result
 }
 
 /// Adds a new zone
 /// # Params
-///     * `_zone` The new zone we want to add.
-///     * `pool` The MySQL connection pool to use.
-/// # Return
-///     * A bool representing whether or not the insert was successful (true) or failed (false)
-pub fn add_new_zone(_zone: ZoneAdd) -> bool {
+///     `ZoneAdd` The zone we are adding
+/// # Example
+/// ```
+/// use sqlsprinkler::zone::Zone;
+/// let zone = Zone::ZoneAdd {
+///     name: "Test Zone".to_string(),
+///     gpio: 1,
+///     time: 1,
+///     enabled: true,
+///     auto_off: true,
+/// }
+/// Zone::add(zone);
+/// ```
+pub fn add(_zone: ZoneAdd) -> bool {
     let pool = get_pool();
     let query =
         "INSERT into `Zones` (`Name`, `Gpio`, `Time`, `AutoOff`, `Enabled`) VALUES ( ?,?,?,?,? )";
-
-    if get_settings().verbose {
-        println!("{}", query);
-    }
     let result = match pool.prep_exec(
         query,
         (
@@ -367,12 +418,13 @@ pub fn add_new_zone(_zone: ZoneAdd) -> bool {
     ) {
         Ok(..) => true,
         Err(e) => {
-            if get_settings().verbose {
-                println!("An error occurred while creating a new zone: {}", e);
-            }
+            error!("An error occurred while creating a new zone: {}", e);
             false
         }
     };
+    if result {
+        info!("Zone created!");
+    }
     result
 }
 

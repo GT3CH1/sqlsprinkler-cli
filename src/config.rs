@@ -9,7 +9,7 @@ lazy_static! {
 }
 
 /// Configuration for the application
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone, Default)]
 pub struct MyConfig {
     /// The user to connect to the database as
     pub sqlsprinkler_user: String,
@@ -39,41 +39,150 @@ pub struct MyConfig {
     pub verbose: bool,
 }
 
-impl Default for MyConfig {
-    fn default() -> Self {
-        Self {
-            sqlsprinkler_user: "".to_string(),
-            sqlsprinkler_pass: "".to_string(),
-            sqlsprinkler_host: "".to_string(),
-            sqlsprinkler_db: "".to_string(),
-            mqtt_host: "".to_string(),
-            mqtt_user: "".to_string(),
-            mqtt_pass: "".to_string(),
-            mqtt_enabled: false,
-            verbose: false,
-        }
+impl MyConfig {
+    /// Set the sqlsprinkler username
+    /// # Arguments
+    /// * `username` - The username to set
+    /// # Returns
+    /// * `Self` - The current instance of the configuration
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::config::MyConfig;
+    /// let mut config = MyConfig::default();
+    /// config.set_sqlsprinkler_user("username");
+    /// ```
+    pub fn set_sqlsprinkler_user(&mut self, username: &str) {
+        self.sqlsprinkler_user = username.to_string();
     }
-}
 
-impl Clone for MyConfig {
-    fn clone(&self) -> MyConfig {
-        MyConfig {
-            sqlsprinkler_user: self.sqlsprinkler_user.clone(),
-            sqlsprinkler_pass: self.sqlsprinkler_pass.clone(),
-            sqlsprinkler_host: self.sqlsprinkler_host.clone(),
-            sqlsprinkler_db: self.sqlsprinkler_db.clone(),
-            mqtt_host: self.mqtt_host.clone(),
-            mqtt_user: self.mqtt_user.clone(),
-            mqtt_pass: self.mqtt_pass.clone(),
-            mqtt_enabled: self.mqtt_enabled,
-            verbose: self.verbose,
-        }
+    /// Set the sqlsprinkler password
+    /// # Arguments
+    /// * `password` - The password to set
+    /// # Returns
+    /// * `Self` - The current instance of the configuration
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::config::MyConfig;
+    /// let mut config = MyConfig::default();
+    /// config.set_sqlsprinkler_pass("password");
+    /// ```
+    pub fn set_sqlsprinkler_pass(&mut self, password: &str) {
+        self.sqlsprinkler_pass = password.to_string();
+    }
+
+    /// Set the sqlsprinkler host
+    /// # Arguments
+    /// * `host` - The host of the database to connect to
+    /// # Returns
+    /// * `Self` - The current instance of the configuration
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::config::MyConfig;
+    /// let mut config = MyConfig::default();
+    /// config.set_sqlsprinkler_host("host");
+    /// ```
+    pub fn set_sqlsprinkler_host(&mut self, host: &str) {
+        self.sqlsprinkler_host = host.to_string();
+    }
+
+    /// Set the sqlsprinkler database
+    /// # Arguments
+    /// * `db` - The database to connect to
+    /// # Returns
+    /// * `Self` - The current instance of the configuration
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::config::MyConfig;
+    /// let mut config = MyConfig::default();
+    /// config.set_sqlsprinkler_db("db");
+    /// ```
+    pub fn set_sqlsprinkler_db(&mut self, db: &str) {
+        self.sqlsprinkler_db = db.to_string();
+    }
+
+    /// Set the mqtt host
+    /// # Arguments
+    /// * `host` - The host of the mqtt server
+    /// # Returns
+    /// * `Self` - The current instance of the configuration
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::config::MyConfig;
+    /// let mut config = MyConfig::default();
+    /// config.set_mqtt_host("host");
+    /// ```
+    pub fn set_mqtt_host(&mut self, host: &str) {
+        self.mqtt_host = host.to_string();
+    }
+
+    /// Set the mqtt username
+    /// # Arguments
+    /// * `username` - The username to set
+    /// # Returns
+    /// * `Self` - The current instance of the configuration
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::config::MyConfig;
+    /// let mut config = MyConfig::default();
+    /// config.set_mqtt_user("username");
+    /// ```
+    pub fn set_mqtt_user(&mut self, username: &str) {
+        self.mqtt_user = username.to_string();
+    }
+
+    /// Set the mqtt password
+    /// # Arguments
+    /// * `password` - The password to set
+    /// # Returns
+    /// * `Self` - The current instance of the configuration
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::config::MyConfig;
+    /// let mut config = MyConfig::default();
+    /// config.set_mqtt_pass("password");
+    /// ```
+    pub fn set_mqtt_pass(&mut self, password: &str) {
+        self.mqtt_pass = password.to_string();
+    }
+
+    /// Sets whether or not the mqtt client should be used
+    /// # Arguments
+    /// * `use_mqtt` - Whether or not to use the mqtt client
+    /// # Returns
+    /// * `Self` - The current instance of the configuration
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::config::MyConfig;
+    /// let mut config = MyConfig::default();
+    /// config.set_use_mqtt(true);
+    /// ```
+    pub fn set_use_mqtt(&mut self, use_mqtt: bool) {
+        self.mqtt_enabled = use_mqtt;
+    }
+
+    /// Sets whether or not the program will start in verbose mode
+    /// # Arguments
+    /// * `verbose` - Whether or not to start in verbose mode
+    /// # Returns
+    /// * `Self` - The current instance of the configuration
+    /// # Example
+    /// ```
+    /// use sqlsprinkler::config::MyConfig;
+    /// let mut config = MyConfig::default();
+    /// config.set_verbose(true);
+    /// ```
+    pub fn set_verbose(&mut self, verbose: bool) {
+        self.verbose = verbose;
     }
 }
 
 /// Get the current configuration
 pub fn get_settings() -> MyConfig {
     SETTINGS.read().unwrap().clone()
+}
+
+pub fn set_settings(settings: MyConfig) {
+    *SETTINGS.write().unwrap() = settings;
 }
 
 /// Read the settings file from `/etc/sqlsprinlker/sqlsprinkler.conf` and load into memory.
