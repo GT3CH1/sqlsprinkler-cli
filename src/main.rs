@@ -12,11 +12,12 @@ use crate::sqlsprinkler::system::{
 };
 use crate::sqlsprinkler::zone::Zone;
 use chrono::Local;
-use env_logger::fmt::Color;
+use env_logger::fmt::{Color, Formatter};
 use env_logger::{Builder, Env};
-use log::{error, info, warn};
+use log::{error, info, warn, Level, Record};
 use mysql::serde_json;
 use sqlsprinkler::daemon;
+use std::fmt;
 use std::fmt::Debug;
 use std::io::Write;
 use std::process::exit;
@@ -136,28 +137,18 @@ fn main() {
             exit(1)
         }
     };
+    let mut log_level = "info";
 
-    if verbose_mode || get_settings().verbose {
-        // Set the verbose mode for env_logger.
-        Builder::from_env(Env::default().default_filter_or("info")).init();
-    } else {
-        Builder::from_env(Env::default().default_filter_or("warn"))
-            .format(|buf, record| {
-                let mut style = buf.style();
-                style.set_bg(Color::White).set_bold(true);
-                writeln!(
-                    buf,
-                    "{} [{}] - {}",
-                    Local::now().format("%Y-%m-%dT%H:%M:%S"),
-                    record.level(),
-                    record.args()
-                )
-            })
-            .init();
+    if !verbose_mode && !get_settings().verbose {
+        log_level = "warn";
     }
 
+    Builder::from_env(Env::default().default_filter_or(log_level))
+        .format(|buf, record| log_formatter(buf, record))
+        .init();
+
     if version_mode {
-        println!("SQLSprinkler v{}", env!("CARGO_PKG_VERSION"));
+        info!("SQLSprinkler v{}", env!("CARGO_PKG_VERSION"));
         exit(0);
     }
 
@@ -248,4 +239,30 @@ fn main() {
             },
         }
     }
+}
+
+fn log_formatter(buf: &mut Formatter, record: &Record) -> Result<(), std::io::Error> {
+    let mut style = buf.style();
+    let mut time_style = buf.style();
+    time_style.set_color(Color::Rgb(0, 238, 255));
+    match record.level() {
+        Level::Error => {
+            style.set_color(Color::Red);
+            style.set_bold(true)
+        }
+        Level::Warn => {
+            style.set_color(Color::Yellow);
+            style.set_bold(true)
+        }
+        Level::Info => style.set_color(Color::White),
+        Level::Debug => style.set_color(Color::Cyan),
+        Level::Trace => style.set_color(Color::Magenta),
+    };
+    writeln!(
+        buf,
+        "{} [{}] - {}",
+        time_style.value(Local::now().format("%m-%d-%Y %H:%M:%S")),
+        style.value(record.level()),
+        style.value(record.args())
+    )
 }
