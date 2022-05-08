@@ -4,11 +4,12 @@ use crate::{
     Zone,
 };
 use lazy_static::lazy_static;
-use log::info;
+use log::{error, info, warn};
 use paho_mqtt as mqtt;
 use paho_mqtt::{AsyncClient, Message};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::process::exit;
 use std::sync::RwLock;
 use std::thread;
 use std::time::Duration;
@@ -42,6 +43,18 @@ pub fn mqtt_run() -> ! {
     let mqtt_host = get_settings().mqtt_host;
     let mqtt_user = get_settings().mqtt_user;
     let mqtt_pass = get_settings().mqtt_pass;
+    if mqtt_host.is_empty() {
+        error!("MQTT host is not set!");
+        exit(1);
+    }
+    if mqtt_user.is_empty() {
+        error!("MQTT user is not set!");
+        exit(1);
+    }
+    if mqtt_pass.is_empty() {
+        error!("MQTT password is not set!");
+        exit(1);
+    }
 
     // create the mqtt client
     let mqtt_client = AsyncClient::new(mqtt_host).unwrap();
@@ -55,14 +68,14 @@ pub fn mqtt_run() -> ! {
 
     // Set a closure to be called whenever the client connection is established.
     mqtt_client.set_connected_callback(|_cli: &AsyncClient| {
-        println!("Connected.");
+        info!("Connected.");
     });
 
     // Set a closure to be called whenever the client loses the connection.
     // It will attempt to reconnect, and set up function callbacks to keep
     // retrying until the connection is re-established.
     mqtt_client.set_connection_lost_callback(|cli: &AsyncClient| {
-        println!("Connection lost. Attempting reconnect.");
+        warn!("Connection lost. Attempting reconnect.");
         thread::sleep(Duration::from_millis(2500));
         cli.reconnect_with_callbacks(on_connect_success, on_connect_failure);
     });
@@ -212,12 +225,12 @@ fn check_msg_zone(topic: &str, payload_str: &str, zone: &Zone) {
 /// * `cli` - The MQTT client
 /// * `_msgid` - The message ID (unused)
 fn on_connect_success(cli: &AsyncClient, _msgid: u16) {
-    println!("Connection succeeded");
+    info!("Connection succeeded");
     send_discovery_message(cli);
     // Subscribe to all zone topics
     for zone in ZONES.read().unwrap().keys() {
         cli.subscribe(zone, 0);
-        println!("Subscribed to {}", zone);
+        info!("Subscribed to {}", zone);
     }
 }
 
