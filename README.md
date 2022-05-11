@@ -46,27 +46,7 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 * [x] `sqlsprinkler-cli zone <id> <on,off,status>`
 * [x] `sqlsprinkler-cli sys <on,off>`
 * [x] SQLSprinkler web api
-    * [x] Get system schedule status → `GET /system/status`
-    * [x] Update system schedule status → `PUT /system/status ` → `{"system_status": status}`
-    * [x] Get zone status → `GET /zone/info`
-    * [x] Toggle zone → `PUT /zone` → `{"id": id, "state": state}`
-    * [x] Update zone information → `PUT /zone/info` → `{
-      "name": "Rust-Zone 123",
-      "gpio": 12,
-      "time": 10,
-      "auto_off": true,
-      "enabled": true,
-      "system_order": 1,
-      "id": 4 }`
-    * [x] Create zone → `POST /zone` → `{
-      "name": "Rust-Zone",
-      "gpio": 12,
-      "time": 10,
-      "auto_off": true,
-      "enabled": true }`
-    * [x] Delete zone → ` DELETE /zone` → `{
-      "id": 1 }`
-    * [x] Change zone ordering → `PUT /zone/order` → `{"order":[0,0,0]}`
+  * For documentation, please see the [API Documentation](#api-documentation)
 * [x] Add support for MQTT and home assistant.
   * Topics subscribed to: 
     * `sqlsprinkler_zone_<id><_enabled_state,_time,_auto_off_state>/command`
