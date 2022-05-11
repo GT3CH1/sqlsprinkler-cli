@@ -46,27 +46,7 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 * [x] `sqlsprinkler-cli zone <id> <on,off,status>`
 * [x] `sqlsprinkler-cli sys <on,off>`
 * [x] SQLSprinkler web api
-    * [x] Get system schedule status → `GET /system/status`
-    * [x] Update system schedule status → `PUT /system/status ` → `{"system_status": status}`
-    * [x] Get zone status → `GET /zone/info`
-    * [x] Toggle zone → `PUT /zone` → `{"id": id, "state": state}`
-    * [x] Update zone information → `PUT /zone/info` → `{
-      "name": "Rust-Zone 123",
-      "gpio": 12,
-      "time": 10,
-      "auto_off": true,
-      "enabled": true,
-      "system_order": 1,
-      "id": 4 }`
-    * [x] Create zone → `POST /zone` → `{
-      "name": "Rust-Zone",
-      "gpio": 12,
-      "time": 10,
-      "auto_off": true,
-      "enabled": true }`
-    * [x] Delete zone → ` DELETE /zone` → `{
-      "id": 1 }`
-    * [x] Change zone ordering → `PUT /zone/order` → `{"order":[0,0,0]}`
+  * Please see the [API Documentation](#api-documentation) for more information.
 * [x] Add support for MQTT and home assistant.
   * Topics subscribed to: 
     * `sqlsprinkler_zone_<id><_enabled_state,_time,_auto_off_state>/command`
@@ -129,3 +109,141 @@ This project is licensed under the MIT license. Please read the [LICENSE](LICENS
 
 ### Code of conduct
 * Please read the [CODE OF CONDUCT](CODE_OF_CONDUCT) file for more information.
+
+## API Documentation
+### Getting the system state
+```http request
+GET /system/state
+```
+#### Response
+```json
+{
+  "system_enabled": true
+}
+```
+---
+### Updating the system state
+```http request
+PUT /system/state
+```
+
+#### Payload
+```json
+{
+  "system_enabled": false
+}
+```
+Setting the system state to false will disable the system, where as setting it to true will enable the system.
+
+---
+
+#### Getting information for all zones
+```http request
+GET /zone/info
+```
+#### Response
+```json
+[
+    {
+        "Name": "Rust-Zone 1",
+        "gpio": 12,
+        "time": 10,
+        "enabled": true,
+        "auto_off": true,
+        "system_order": 0,
+        "state": false,
+        "id": 1
+    }
+    ...
+]
+```
+
+This will return a list of all the zones and their information.
+
+---
+
+### Updating the state of a zone
+```http request
+PUT /zone
+```
+#### Payload
+```json
+{
+  "id": 1,
+  "state": true
+}
+```
+This will turn on a zone with the ID of 1.
+
+---
+
+### Adding a zone
+```http request
+POST /zone
+```
+#### Payload
+```json
+{
+  "name": "Rust-Zone",
+  "gpio": 12,
+  "time": 10,
+  "enabled": true,
+  "auto_off": true,
+}
+```
+
+This will add a zone with the name of "Rust-Zone", GPIO pin 12, time 10 minutes, enabled, and auto off.
+System order and ID aren't specified. The ID will be automatically assigned, and the system order will be set to the default of 0.
+
+---
+
+### Deleting a zone
+```http request
+DELETE /zone
+```
+#### Payload
+```json
+{
+  "id": 1
+}
+```
+
+This will delete the zone with the ID of 1.
+
+---
+
+### Updating zone information
+```http request
+PUT /zone/update
+```
+#### Payload
+```json
+{
+  "id": 1,
+  "name": "Rust-Zone",
+  "gpio": 12,
+  "time": 10,
+  "enabled": true,
+  "auto_off": true,
+  "system_order": 0,
+}
+```
+
+This will update the zone with a matching ID with the information provided.
+
+---
+
+#### Updating zone order
+```http request
+PUT /zone/order
+```
+#### Payload
+```json
+{
+  "order" : [0,4,3,2]
+}
+```
+
+This will update the order of the zones, updating the zones ORDERED BY the current system order.
+This example would mean the zone that is currently at system order 0, will be moved to system order 0,
+the zone that is currently at system order 1, will be moved to system order 4, and so on.
