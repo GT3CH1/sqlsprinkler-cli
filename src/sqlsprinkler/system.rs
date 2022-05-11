@@ -1,6 +1,6 @@
-use crate::sqlsprinkler::{get_pool, zone};
 use crate::get_settings;
-use std::{time, thread};
+use crate::sqlsprinkler::{get_pool, zone};
+use std::{thread, time};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct SysStatus {
@@ -14,10 +14,9 @@ pub struct SysStatus {
 ///     * `enabled` If true is passed in, the system is enabled. If false is used, the system is disabled.
 pub fn set_system_status(enabled: bool) {
     let pool = get_pool();
-    let query = format!("UPDATE Enabled set enabled = {}", enabled);
-    pool.prep_exec(query, ()).unwrap();
+    let query = "UPDATE Enabled set enabled = ?";
+    pool.prep_exec(query, (enabled,)).unwrap();
 }
-
 
 /// Gets whether the system schedule is enabled or disabled
 /// # Arguments
@@ -26,19 +25,20 @@ pub fn set_system_status(enabled: bool) {
 ///     * `bool` True if the system is enabled, false if not.
 pub(crate) fn get_system_status() -> bool {
     let pool = get_pool();
-    let query = format!("SELECT enabled FROM Enabled");
-    let sys_status: Vec<SysStatus> =
-        pool.prep_exec(query, ())
-            .map(|result| {
-                result.map(|x| x.unwrap()).map(|row| {
+    let query = "SELECT enabled FROM Enabled";
+    let sys_status: Vec<SysStatus> = pool
+        .prep_exec(query, ())
+        .map(|result| {
+            result
+                .map(|x| x.unwrap())
+                .map(|row| {
                     let status = mysql::from_row(row);
-                    SysStatus {
-                        status
-                    }
-                }).collect()
-            }).unwrap();
-    //TODO: Rewrite this method so this ugly line does not need to exist.
-    return sys_status[0].status;
+                    SysStatus { status }
+                })
+                .collect()
+        })
+        .unwrap();
+    sys_status[0].status
 }
 
 /// Gets a list of all the zones in this database
@@ -50,24 +50,19 @@ pub(crate) fn get_zones() -> zone::ZoneList {
     let pool = get_pool();
     let mut conn = pool.get_conn().unwrap();
     let query = "SELECT Name, GPIO, Time, Enabled, AutoOff, SystemOrder, ID from Zones ORDER BY SystemOrder";
-    let rows = conn
-        .query(query)
-        .unwrap();
-    if get_settings().verbose {
-        println!("{}", query);
-    }
+    let rows = conn.query(query).unwrap();
     let mut zone_list: Vec<zone::Zone> = vec![];
     for row in rows {
         let _row = row.unwrap();
-        let zone = zone::Zone::from(_row);
-        zone_list.push(zone);
-    }
-    let list = zone::ZoneList {
-        zones: zone_list
-    };
-    return list;
-}
 
+        let zone = zone::Zone::from(_row);
+        zone_list.push(zone.clone());
+        if get_settings().verbose {
+            println!("{}", zone);
+        }
+    }
+    zone::ZoneList { zones: zone_list }
+}
 
 /// Runs the system based on the schedule configured. Skips over any zones that are not enabled in the database.
 pub fn run() {
@@ -75,7 +70,7 @@ pub fn run() {
     for zone in &zone_list.zones {
         // Skip over zones that aren't enabled in the database.
         if zone.enabled {
-            zone.run_zone();
+            zone.run();
         }
     }
 }

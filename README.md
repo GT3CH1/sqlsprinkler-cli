@@ -1,24 +1,24 @@
-# sqlsprinkler-cli 0.1.2
+# sqlsprinkler-cli
+### v0.1.6
+A command line interface for the SQLSprinkler project, made specifically for the raspberry pi.
 
-A command line interface for the SQLSprinkler project
-
-## Authors & Contributers
-
+## Authors & Contributors
 - Gavin Pease
 
 ## Building
 * Dependencies
     - [cross](https://github.com/rust-embedded/cross)
     - Docker
+    - Rust
 
-After installing the build dependencies, you can run `make deb` to create a `.deb` package.
+After installing the build dependencies, you can run `make deb` to create a `.deb` package, you can
+then install it with `sudo dpkg -i sqlsprinkler-cli_0.1.6_armhf.deb`.
 
 ## Installing
-
-* To install, please run `# make install`
+* To install, please run `# make install`. This will install the binary to `/usr/bin/sqlsprinkler-cli`.
+    * Running this command _should_ generate a binary that will work across all raspberry pi's.
 
 ## Usage
-
 sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified program.
 
 * `sqlsprinkler-cli`
@@ -29,7 +29,7 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
     - Turn the given zone on or off
 * `sqlsprinkler-cli sys <on,off,winterize,run,status>`
     - Operate on the system.
-* `sqlsprinkler-cli -ha`
+* `sqlsprinkler-cli -m`
     - Starts the SQLSprinkler MQTT listener for home assistant integration.
 * You can set the database username, password, and host in the `/etc/sqlsprinkler/sqlsprinkler.conf` configuration file.
 
@@ -84,7 +84,8 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
       * The master toggle switch for nightly runs.
     * `sqlsprinkler_zone_<id><_enabled_state,_time,_auto_off_state>/status`
       * The status of the functionality of the zone.
-      * 
+
+
 ## Used libraries
 * rust >= 1.53.0
 * structopt 0.3.13
@@ -98,6 +99,7 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 * lazy_static 1.4.0
 * paho-mqtt 0.11
 * serde 1.0
+
 ## How-to-use
 * Run the program once, as `sudo`, you will get a connection error.
 * Set your username, password, host, and database in `/etc/sqlsprinkler/sqlsprinkler.conf`
@@ -110,6 +112,23 @@ sqlsprinkler-cli allows control over a SQLSprinkler endpoint via a unified progr
 - `mqtt_host` The hostname of the mqtt broker.
 - `mqtt_user` The username of the mqtt broker.
 - `mqtt_pass` The password of the mqtt broker.
+
+## Issues and bugs
+* Please report any issues or bugs [here](https://github.com/GT3CH1/sqlsprinkler-cli/issues)
+
+### License
+This project is licensed under the MIT license. Please read the [LICENSE](LICENSE) file for more information.
+
+### Contributing
+* Please feel free to by:
+  - Making an issue [here](https://github.com/GT3CH1/sqlsprinkler-cli/issues)
+  - Forking the project [here](https://github.com/GT3CH1/sqlsprinkler-cli)
+  - Making changes to the project.
+  - Opening a pull request [here](https://github.com/GT3CH1/sqlsprinkler-cli/pulls)
+  - Lastly, please be descriptive and constructive with your contribution.
+
+### Code of conduct
+* Please read the [CODE OF CONDUCT](CODE_OF_CONDUCT) file for more information.
 
 ## API Documentation
 ### Getting the system state
