@@ -157,7 +157,7 @@ async fn get_zone_status() -> Result<impl warp::Reply, warp::Rejection> {
 ///    * `_zone` The ZoneToggle object containing the id of the zone we are going to toggle and the state we are going to set it to.
 async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, warp::Rejection> {
     let state = _zone.state;
-    let zone = get_zone_from_order(_zone.id);
+    let zone = get_zone_from_id(_zone.id);
     if state {
         /*
         NOTE:
