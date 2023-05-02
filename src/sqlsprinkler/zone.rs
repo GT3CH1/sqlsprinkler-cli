@@ -4,7 +4,7 @@ use mysql::{params, Row};
 use rppal::gpio::{Gpio, OutputPin};
 use serde::{Deserialize, Serialize};
 use std::convert::From;
-use std::{fmt, thread, time};
+use std::{fmt, process, thread, time};
 
 /// Represents a SQLSprinkler zone.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -31,7 +31,12 @@ impl Zone {
     /// # Return
     ///     `gpio` An OutputPin that we can use to turn the zone on or off
     pub(self) fn get_gpio(&self) -> OutputPin {
-        let mut pin = Gpio::new().unwrap().get(self.gpio).unwrap().into_output();
+        let gpio = Gpio::new();
+        if gpio.is_err() {
+            println!("Failed to get GPIO interface. Are you on a Raspberry Pi / running as root?");
+            process::exit(1);
+        }
+        let mut pin = gpio.unwrap().get(self.gpio).unwrap().into_output();
         // tl;dr without this line, pins get reset immediately.
         pin.set_reset_on_drop(false);
         pin
@@ -169,13 +174,14 @@ impl Clone for Zone {
         }
     }
 }
+
 /// Formats the zone to be displayed as
 /// `name | gpio | time | auto_off | enabled | system_order | id`
 impl fmt::Display for Zone {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} | {} | {} | {} | {} | {} | {}",
+            "Name: {} | Gpio: {} | Time: {} | Enabled: {} | AutoOff: {} | Order: {} | Id: {}",
             self.name,
             self.gpio,
             self.time,
@@ -265,7 +271,7 @@ pub struct ZoneList {
 pub fn get_zone_from_id(zone_id: i8) -> Zone {
     let query = format!("SELECT Name,GPIO,Time,Enabled,AutoOff,SystemOrder,ID FROM Zones WHERE ID = {}", zone_id);
 
-    let mut rows = get_pool().prep_exec(query,()).unwrap();
+    let mut rows = get_pool().prep_exec(query, ()).unwrap();
     // let mut rows = stmt.prep+((zone_id,)).unwrap();
     // Get the first row in rows
     if get_settings().verbose {
@@ -276,7 +282,7 @@ pub fn get_zone_from_id(zone_id: i8) -> Zone {
     if !rows.more_results_exists() {
         if get_settings().verbose {
             println!("Default zone on get_zone_from_id: {}", zone_id);
-            println!("SELECT * FROM Zones WHERE id = {}",zone_id);
+            println!("SELECT * FROM Zones WHERE id = {}", zone_id);
         }
         return _zone;
     }
@@ -296,7 +302,7 @@ pub fn get_zone_from_id(zone_id: i8) -> Zone {
 pub fn get_zone_from_order(zone_order: i8) -> Zone {
     let query = format!("SELECT Name,GPIO,Time,Enabled,AutoOff,SystemOrder,ID FROM Zones WHERE SystemOrder = {}", zone_order);
 
-    let mut rows = get_pool().prep_exec(query,()).unwrap();
+    let mut rows = get_pool().prep_exec(query, ()).unwrap();
     // let mut rows = stmt.prep+((zone_id,)).unwrap();
     // Get the first row in rows
     if get_settings().verbose {
@@ -329,7 +335,7 @@ pub fn delete_zone(_zone: ZoneDelete) -> bool {
     if get_settings().verbose {
         println!("{}", query);
     }
-    let result = match pool.prep_exec(query, (_zone.id,)) {
+    let result = match pool.prep_exec(query, (_zone.id, )) {
         Ok(..) => true,
         Err(..) => {
             if get_settings().verbose {

@@ -17,6 +17,7 @@ use crate::sqlsprinkler::system::{
 };
 use crate::sqlsprinkler::zone::Zone;
 use sqlsprinkler::daemon;
+use crate::sqlsprinkler::get_pool;
 
 /// Holds the program's possible CLI options.
 #[derive(Debug, StructOpt)]
@@ -28,17 +29,17 @@ pub struct Opts {
 
     /// Whether or not to run in daemon mode
     #[structopt(
-        short = "w",
-        long = "daemon",
-        about = "Launches the SQLSprinkler API web daemon."
+    short = "w",
+    long = "daemon",
+    about = "Launches the SQLSprinkler API web daemon."
     )]
     daemon_mode: bool,
 
     /// Whether or not to run in home assistant mode using MQTT
     #[structopt(
-        short = "m",
-        long = "home-assistant",
-        about = "Broadcasts the current system to home assistant."
+    short = "m",
+    long = "home-assistant",
+    about = "Broadcasts the current system to home assistant."
     )]
     home_assistant: bool,
 
@@ -56,8 +57,48 @@ enum Cli {
 
 /// Zone options
 #[derive(StructOpt, Debug)]
-struct ZoneOpts {
+enum ZoneOpts {
+    State(ZoneState),
+    Add(ZoneAdd),
+    Delete(ZoneDelete),
+    Modify(ZoneModify),
+    List,
+}
+
+#[derive(StructOpt, Debug)]
+struct ZoneModify {
     id: u8,
+    name: String,
+    gpio: u8,
+    time: u64,
+    #[structopt(parse(try_from_str))]
+    enabled: bool,
+    #[structopt(parse(try_from_str))]
+    auto_off: bool,
+    order: u8,
+}
+
+#[derive(StructOpt, Debug)]
+struct ZoneDelete {
+    id: u8,
+}
+
+#[derive(StructOpt, Debug)]
+struct ZoneAdd {
+    name: String,
+    gpio: u8,
+    time: u64,
+    #[structopt(parse(try_from_str))]
+    enabled: bool,
+    #[structopt(parse(try_from_str))]
+    auto_off: bool,
+}
+
+#[derive(StructOpt, Debug)]
+struct ZoneState {
+    /// The ID of the zone to modify.
+    id: u8,
+    /// The state of the zone.
     state: String,
 }
 
@@ -114,7 +155,6 @@ enum SysOpts {
 /// Main entry point for the SQLSprinkler program.
 fn main() {
     let cli = Opts::from_args();
-    println!("{:?}", cli);
 
     let daemon_mode = cli.daemon_mode;
     let version_mode = cli.version_mode;
@@ -147,35 +187,100 @@ fn main() {
         match subcommand {
             // `sqlsprinkler zone ...`
             Cli::Zone(zone_state) => {
-                let id = usize::from(zone_state.id);
-                let _zone_list = zone_list;
-                let my_zone: &Zone = match _zone_list.zones.get(id) {
-                    Some(z) => z,
-                    None => {
-                        // Return the default zone.
-                        panic!("Zone {} not found.", id);
-                    }
-                };
-                match zone_state.state.parse().unwrap() {
-                    ZoneOptsArgs::On => {
-                        turn_off_all_zones();
-                        my_zone.turn_on();
-                    }
-                    ZoneOptsArgs::Off => {
-                        my_zone.turn_off();
-                    }
-                    ZoneOptsArgs::Status => {
-                        let zone = &my_zone;
-                        println!(
-                            "The zone is {}",
-                            if zone.get_with_state().state {
-                                "on"
-                            } else {
-                                "off"
+                match zone_state {
+                    ZoneOpts::State(x) => {
+                        let id = usize::from(x.id);
+                        let _zone_list = zone_list;
+                        // find the zone with the matching id.
+                        let my_zone = match _zone_list.zones.into_iter().find(|z| z.id == (id as i8)) {
+                            None => {
+                                println!("Unable to find zone with id {}", id);
+                                exit(1);
                             }
+                            Some(z) => z
+                        };
+                        match x.state.parse().unwrap() {
+                            ZoneOptsArgs::On => {
+                                turn_off_all_zones();
+                                my_zone.turn_on();
+                            }
+                            ZoneOptsArgs::Off => {
+                                my_zone.turn_off();
+                            }
+                            ZoneOptsArgs::Status => {
+                                let state = if my_zone.get_with_state().state {
+                                    "on"
+                                } else {
+                                    "off"
+                                };
+                                println!("Zone {} ({}) is turned {}.", my_zone.id, my_zone.name, state)
+                            }
+                        }
+                    }
+                    ZoneOpts::Add(x) => {
+                        let pool = get_pool();
+                        let query = format!(
+                            "INSERT INTO Zones (name, gpio, time, enabled, autooff, systemorder) VALUES (?, ?, ?, ?, ?, ?)",
                         );
+                        match pool.prep_exec(query, (x.name, x.gpio, x.time, x.enabled, x.auto_off, 0 as i64)) {
+                            Ok(_) => println!("Zone added successfully."),
+                            Err(e) => println!("An error occurred while adding the zone: {}", e),
+                        }
+                    }
+                    ZoneOpts::Delete(x) => {
+                        let pool = get_pool();
+                        let query = format!("DELETE FROM Zones WHERE id = {}", x.id);
+                        match pool.prep_exec(query, ()) {
+                            Ok(_) => println!("Zone deleted successfully."),
+                            Err(e) => println!("An error occurred while deleting the zone: {}", e),
+                        }
+                    }
+                    ZoneOpts::Modify(x) => {
+                        let pool = get_pool();
+                        let mut query = format!("UPDATE Zones SET name=?, gpio=?, time=?, enabled=?, autooff=?, systemorder=? WHERE id = ?");
+                        match pool.prep_exec(query, (x.name, x.gpio, x.time, x.enabled, x.auto_off, x.order, x.id)) {
+                            Ok(_) => println!("Zone modified successfully."),
+                            Err(e) => println!("An error occurred while modifying the zone: {}", e),
+                        }
+                    }
+                    ZoneOpts::List => {
+                        // fetch all zones and print them
+                        let list = get_zones();
+                        for zone in list.zones {
+                            println!("{}", zone);
+                        }
                     }
                 }
+
+                // let id = usize::from(zone_state.id);
+                // let _zone_list = zone_list;
+                // let my_zone: &Zone = match _zone_list.zones.get(id) {
+                //     Some(z) => z,
+                //     None => {
+                //         // Return the default zone.
+                //         panic!("Zone {} not found.", id);
+                //     }
+                // };
+                // match zone_state.state.parse().unwrap() {
+                //     ZoneOptsArgs::On => {
+                //         turn_off_all_zones();
+                //         my_zone.turn_on();
+                //     }
+                //     ZoneOptsArgs::Off => {
+                //         my_zone.turn_off();
+                //     }
+                //     ZoneOptsArgs::Status => {
+                //         let zone = &my_zone;
+                //         println!(
+                //             "The zone is {}",
+                //             if zone.get_with_state().state {
+                //                 "on"
+                //             } else {
+                //                 "off"
+                //             }
+                //         );
+                //     }
+                // }
             }
             // `sqlsprinkler sys ...`
             Cli::Sys(sys_opts) => match sys_opts {
