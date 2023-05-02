@@ -1,10 +1,11 @@
+use crate::get_settings;
 use crate::sqlsprinkler::get_pool;
 use log::{debug, error, info};
 use mysql::{params, Row};
 use rppal::gpio::{Gpio, OutputPin};
 use serde::{Deserialize, Serialize};
 use std::convert::From;
-use std::{fmt, thread, time};
+use std::{fmt, process, thread, time};
 
 /// Represents a SQLSprinkler zone.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default)]
@@ -29,8 +30,12 @@ impl Zone {
     /// let gpio = zone.get_gpio();
     /// ```
     pub(self) fn get_gpio(&self) -> OutputPin {
-        let mut pin = Gpio::new().unwrap().get(self.gpio).unwrap().into_output();
-
+        let gpio = Gpio::new();
+        if gpio.is_err() {
+            println!("Failed to get GPIO interface. Are you on a Raspberry Pi / running as root?");
+            process::exit(1);
+        }
+        let mut pin = gpio.unwrap().get(self.gpio).unwrap().into_output();
         // tl;dr without this line, pins get reset immediately.
         pin.set_reset_on_drop(false);
         pin
@@ -210,13 +215,28 @@ impl Zone {
     }
 }
 
+/// Clone this zone.
+impl Clone for Zone {
+    fn clone(&self) -> Self {
+        Zone {
+            name: self.name.clone(),
+            gpio: self.gpio,
+            time: self.time,
+            enabled: self.enabled,
+            auto_off: self.auto_off,
+            system_order: self.system_order,
+            id: self.id,
+        }
+    }
+}
+
 /// Formats the zone to be displayed as
 /// `name | gpio | time | auto_off | enabled | system_order | id`
 impl fmt::Display for Zone {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} | {} | {} | {} | {} | {} | {}",
+            "Name: {} | Gpio: {} | Time: {} | Enabled: {} | AutoOff: {} | Order: {} | Id: {}",
             self.name,
             self.gpio,
             self.time,
@@ -321,8 +341,10 @@ pub fn get_zone_from_id(zone_id: i8) -> Zone {
 
     let mut _zone = Zone::default();
     if !rows.more_results_exists() {
-        debug!("Default zone on get_zone_from_id: {}", zone_id);
-        debug!("SELECT * FROM Zones WHERE id = {}", zone_id);
+        if get_settings().verbose {
+            println!("Default zone on get_zone_from_id: {}", zone_id);
+            println!("SELECT * FROM Zones WHERE id = {}", zone_id);
+        }
         return _zone;
     }
     let row = rows.next().unwrap().unwrap();
@@ -373,7 +395,10 @@ pub fn get_zone_from_order(zone_order: i8) -> Zone {
 pub fn delete(_zone: ZoneDelete) -> bool {
     let pool = get_pool();
     let query = "DELETE FROM `Zones` WHERE id = ?";
-    let result = match pool.prep_exec(query, (_zone.id,)) {
+    if get_settings().verbose {
+        println!("{}", query);
+    }
+    let result = match pool.prep_exec(query, (_zone.id, )) {
         Ok(..) => true,
         Err(..) => {
             error!("An error occurred while deleting ");
