@@ -8,7 +8,7 @@ use std::convert::From;
 use std::{fmt, process, thread, time};
 
 /// Represents a SQLSprinkler zone.
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Zone {
     pub name: String,
     pub gpio: u8,
@@ -32,7 +32,7 @@ impl Zone {
     pub(self) fn get_gpio(&self) -> OutputPin {
         let gpio = Gpio::new();
         if gpio.is_err() {
-            println!("Failed to get GPIO interface. Are you on a Raspberry Pi / running as root?");
+            error!("Failed to get GPIO interface. Are you on a Raspberry Pi / running as root?");
             process::exit(1);
         }
         let mut pin = gpio.unwrap().get(self.gpio).unwrap().into_output();
