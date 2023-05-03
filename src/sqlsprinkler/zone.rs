@@ -1,21 +1,26 @@
-use crate::get_settings;
 use crate::sqlsprinkler::get_pool;
-use log::{debug, error, info};
-use mysql::{params, Row};
+use log::{error, info};
 use rppal::gpio::{Gpio, OutputPin};
 use serde::{Deserialize, Serialize};
-use std::convert::From;
 use std::{fmt, process, thread, time};
+use structopt::StructOpt;
 
 /// Represents a SQLSprinkler zone.
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, sqlx::FromRow)]
+#[allow(non_snake_case)]
 pub struct Zone {
-    pub name: String,
-    pub gpio: u8,
-    pub time: u64,
-    pub enabled: bool,
-    pub auto_off: bool,
-    pub system_order: i8,
+    #[allow(non_snake_case)]
+    pub Name: String,
+    #[allow(non_snake_case)]
+    pub GPIO: i8,
+    #[allow(non_snake_case)]
+    pub Time: i64,
+    #[allow(non_snake_case)]
+    pub Enabled: bool,
+    #[allow(non_snake_case)]
+    pub Autooff: bool,
+    #[allow(non_snake_case)]
+    pub SystemOrder: i8,
     pub id: i8,
 }
 
@@ -29,16 +34,19 @@ impl Zone {
     /// let zone = Zone::default();
     /// let gpio = zone.get_gpio();
     /// ```
-    pub(self) fn get_gpio(&self) -> OutputPin {
+    pub(self) fn get_gpio(&self) -> Result<OutputPin, rppal::gpio::Error> {
         let gpio = Gpio::new();
-        if gpio.is_err() {
-            error!("Failed to get GPIO interface. Are you on a Raspberry Pi / running as root?");
-            process::exit(1);
-        }
-        let mut pin = gpio.unwrap().get(self.gpio).unwrap().into_output();
-        // tl;dr without this line, pins get reset immediately.
-        pin.set_reset_on_drop(false);
-        pin
+        return match gpio {
+            Ok(gpio) => {
+                let mut pin = gpio.get(self.GPIO as u8).unwrap().into_output();
+                pin.set_reset_on_drop(false);
+                Ok(pin)
+            }
+            Err(e) => {
+                error!("Failed to get GPIO interface. Are you on a Raspberry Pi / running as root?");
+                Err(e)
+            }
+        };
     }
 
     /// Turns on this zone.
@@ -50,7 +58,7 @@ impl Zone {
     /// ```
     pub fn turn_on(&self) {
         info!("Turned on {}", self);
-        let mut gpio = self.get_gpio();
+        let mut gpio = self.get_gpio().unwrap();
         gpio.set_low();
     }
 
@@ -61,10 +69,18 @@ impl Zone {
     /// let zone = Zone::default();
     /// zone.turn_off();
     /// ```
-    pub fn turn_off(&self) {
-        let mut gpio = self.get_gpio();
-        info!("Turned off {}", self);
-        gpio.set_high();
+    pub fn turn_off(&self) -> Result<(), rppal::gpio::Error> {
+        match self.get_gpio() {
+            Ok(mut gpio) => {
+                info!("Turned off {}", self);
+                gpio.set_high();
+                Ok(())
+            }
+            Err(e) => {
+                error!("Failed to get GPIO interface. Are you on a Raspberry Pi / running as root?");
+                Err(e)
+            }
+        }
     }
 
     /// Gets the name of this zone
@@ -75,7 +91,7 @@ impl Zone {
     /// let name = zone.get_name();
     /// ```
     pub(self) fn get_name(&self) -> String {
-        self.clone().name
+        self.clone().Name
     }
 
     /// Gets whether or not this zone is on
@@ -88,7 +104,7 @@ impl Zone {
     /// # Return
     ///     `on` A bool representing whether or not this zone is on.
     pub(self) fn is_on(&self) -> bool {
-        let gpio = self.get_gpio();
+        let gpio = self.get_gpio().unwrap();
         gpio.is_set_low()
     }
 
@@ -100,7 +116,7 @@ impl Zone {
     /// zone.test();
     /// ```
     pub fn test(&self) {
-        info!("Testing {}", self.name);
+        info!("Testing {}", self.Name);
         self.turn_on();
         let run_time = time::Duration::from_secs(12);
         thread::sleep(run_time);
@@ -117,11 +133,11 @@ impl Zone {
     /// ```
     pub fn run_async(&self) {
         self.turn_on();
-        if self.auto_off {
+        if self.Autooff {
             // Need to clone because we are moving into a new thread.
             let _zone = self.clone();
             thread::spawn(move || {
-                let run_time = time::Duration::from_secs(_zone.time * 60);
+                let run_time = time::Duration::from_secs((_zone.Time * 60) as u64);
                 thread::sleep(run_time);
                 _zone.turn_off();
             });
@@ -138,7 +154,7 @@ impl Zone {
     pub fn run(&self) {
         self.turn_on();
         let _zone = self.clone();
-        let run_time = time::Duration::from_secs(_zone.time * 60);
+        let run_time = time::Duration::from_secs((_zone.Time * 60) as u64);
         thread::sleep(run_time);
         _zone.turn_off();
     }
@@ -156,25 +172,20 @@ impl Zone {
     /// new_zone.name = "New Name".to_string();
     /// zone.update(new_zone);
     /// ```
-    pub fn update(&self, zone: Zone) -> bool {
-        let query = get_pool().prepare("UPDATE Zones SET Name=:name, Gpio=:gpio, Time=:time, AutoOff=:autooff,Enabled=:enabled,SystemOrder=:so WHERE ID=:id").into_iter();
-        let mut updated: bool = false;
-        for mut stmt in query {
-            updated = stmt
-                .execute(params! {
-                    "name" => &zone.name,
-                    "gpio" => zone.gpio,
-                    "time" => zone.time,
-                    "autooff" => zone.auto_off,
-                    "enabled" => zone.enabled,
-                    "so" => zone.system_order,
-                    "id" => self.id
-                })
-                .unwrap()
-                .affected_rows()
-                == 1;
-        }
-        updated
+    pub async fn update(&self, zone: Zone) -> Result<bool, sqlx::Error> {
+        // let query = get_pool().prepare("UPDATE Zones SET Name=?, Gpio=?, Time=?, AutoOff=?, Enabled=? ,SystemOrder=? WHERE ID=?").into_iter();
+        let rows = sqlx::query!(
+            "UPDATE Zones SET Name=?, GPIO=?, Time=?, Autooff=?, Enabled=? ,SystemOrder=? WHERE ID=?",
+            zone.Name,
+            zone.GPIO,
+            zone.Time,
+            zone.Autooff,
+            zone.Enabled,
+            zone.SystemOrder,
+            self.id
+        ).execute(&get_pool().await?).await?;
+        info!("Updated zone with id {}", self.id);
+        Ok(true)
     }
 
     /// Gets a representation of this zone, but also with `is_on` as bool `state`
@@ -189,11 +200,11 @@ impl Zone {
     pub fn get_with_state(&self) -> ZoneWithState {
         ZoneWithState {
             name: self.get_name(),
-            gpio: self.gpio,
-            time: self.time,
-            enabled: self.enabled,
-            auto_off: self.auto_off,
-            system_order: self.system_order,
+            gpio: self.GPIO,
+            time: self.Time,
+            enabled: self.Enabled,
+            auto_off: self.Autooff,
+            system_order: self.SystemOrder,
             state: self.is_on(),
             id: self.id,
         }
@@ -208,10 +219,13 @@ impl Zone {
     /// let zone = Zone::default();
     /// zone.set_order(1);
     /// ```
-    pub fn set_order(&self, order: i8) {
+    pub async fn set_order(&self, order: i8) {
         let mut updated_zone = self.clone();
-        updated_zone.system_order = order;
-        self.update(updated_zone);
+        updated_zone.SystemOrder = order;
+        match self.update(updated_zone).await {
+            Ok(_) => info!("Updated order of zone with id {}", self.id),
+            Err(e) => error!("Failed to update order of zone with id {}: {}", self.id, e),
+        }
     }
 }
 
@@ -219,12 +233,12 @@ impl Zone {
 impl Clone for Zone {
     fn clone(&self) -> Self {
         Zone {
-            name: self.name.clone(),
-            gpio: self.gpio,
-            time: self.time,
-            enabled: self.enabled,
-            auto_off: self.auto_off,
-            system_order: self.system_order,
+            Name: self.Name.clone(),
+            GPIO: self.GPIO,
+            Time: self.Time,
+            Enabled: self.Enabled,
+            Autooff: self.Autooff,
+            SystemOrder: self.SystemOrder,
             id: self.id,
         }
     }
@@ -237,29 +251,14 @@ impl fmt::Display for Zone {
         write!(
             f,
             "Name: {} | Gpio: {} | Time: {} | Enabled: {} | AutoOff: {} | Order: {} | Id: {}",
-            self.name,
-            self.gpio,
-            self.time,
-            self.enabled,
-            self.auto_off,
-            self.system_order,
+            self.Name,
+            self.GPIO,
+            self.Time,
+            self.Enabled,
+            self.Autooff,
+            self.SystemOrder,
             self.id
         )
-    }
-}
-
-/// Converts a row from the MySQL database to a Zone struct.
-impl From<Row> for Zone {
-    fn from(row: Row) -> Self {
-        Zone {
-            name: row.get("Name").unwrap(),
-            gpio: row.get("GPIO").unwrap(),
-            time: row.get("Time").unwrap(),
-            enabled: row.get("Enabled").unwrap(),
-            auto_off: row.get("AutoOff").unwrap(),
-            system_order: row.get("SystemOrder").unwrap(),
-            id: row.get("ID").unwrap(),
-        }
     }
 }
 
@@ -290,12 +289,14 @@ pub struct ZoneDelete {
 }
 
 /// Used when we are creating a new zone from an api response.
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, StructOpt)]
 pub struct ZoneAdd {
     pub name: String,
     pub gpio: i8,
     pub time: u64,
+    #[structopt(parse(try_from_str))]
     pub enabled: bool,
+    #[structopt(parse(try_from_str))]
     pub auto_off: bool,
 }
 
@@ -303,8 +304,8 @@ pub struct ZoneAdd {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ZoneWithState {
     pub name: String,
-    pub gpio: u8,
-    pub time: u64,
+    pub gpio: i8,
+    pub time: i64,
     pub enabled: bool,
     pub auto_off: bool,
     pub system_order: i8,
@@ -328,27 +329,16 @@ pub struct ZoneList {
 /// use sqlsprinkler::zone::Zone;
 /// let zone = Zone::get_zone(1);
 /// ```
-pub fn get_zone_from_id(zone_id: i8) -> Zone {
-    let query = format!(
-        "SELECT Name,GPIO,Time,Enabled,AutoOff,SystemOrder,ID FROM Zones WHERE ID = {}",
-        zone_id
-    );
-
-    let mut rows = get_pool().prep_exec(query, ()).unwrap();
-    // let mut rows = stmt.prep+((zone_id,)).unwrap();
-    // Get the first row in rows
+pub async fn get_zone_from_id(zone_id: i8) -> Result<Zone, sqlx::Error> {
+    let zones = sqlx::query_as::<_, Zone>("SELECT * FROM Zones WHERE id = ?")
+        .bind(zone_id)
+        .fetch_all(&get_pool().await?)
+        .await?;
     info!("Getting row from id: {}", zone_id);
-
-    let mut _zone = Zone::default();
-    if !rows.more_results_exists() {
-        if get_settings().verbose {
-            println!("Default zone on get_zone_from_id: {}", zone_id);
-            println!("SELECT * FROM Zones WHERE id = {}", zone_id);
-        }
-        return _zone;
+    if zones.is_empty() {
+        return Ok(Zone::default());
     }
-    let row = rows.next().unwrap().unwrap();
-    Zone::from(row)
+    Ok(zones[0].clone())
 }
 
 /// Gets a zone from the given id
@@ -361,24 +351,17 @@ pub fn get_zone_from_id(zone_id: i8) -> Zone {
 /// use sqlsprinkler::zone::Zone;
 /// let zone = Zone::get_zone_from_order(1);
 /// ```
-pub fn get_zone_from_order(zone_order: i8) -> Zone {
-    let query = format!(
-        "SELECT Name,GPIO,Time,Enabled,AutoOff,SystemOrder,ID FROM Zones WHERE SystemOrder = {}",
-        zone_order
-    );
-
-    let mut rows = get_pool().prep_exec(query, ()).unwrap();
-    // let mut rows = stmt.prep+((zone_id,)).unwrap();
-    // Get the first row in rows
-    info!("Getting row from system order: {}", zone_order);
-
+pub async fn get_zone_from_order(zone_order: i8) -> Result<Zone, sqlx::Error> {
+    let query = sqlx::query_as::<_, Zone>("SELECT * FROM Zones WHERE SystemOrder = ?")
+        .bind(zone_order)
+        .fetch_all(&get_pool().await?)
+        .await?;
     let mut _zone = Zone::default();
-    if !rows.more_results_exists() {
+    if query.len() == 0 {
         info!("Default zone on get_zone_from_order: {}", zone_order);
-        return _zone;
+        return Ok(_zone);
     }
-    let row = rows.next().unwrap().unwrap();
-    Zone::from(row)
+    Ok(query[0].clone())
 }
 
 /// Deletes the given zone
@@ -392,23 +375,21 @@ pub fn get_zone_from_order(zone_order: i8) -> Zone {
 /// let zone = Zone::get_zone(1);
 /// zone.delete();
 /// ```
-pub fn delete(_zone: ZoneDelete) -> bool {
-    let pool = get_pool();
-    let query = "DELETE FROM `Zones` WHERE id = ?";
-    if get_settings().verbose {
-        println!("{}", query);
-    }
-    let result = match pool.prep_exec(query, (_zone.id, )) {
-        Ok(..) => true,
-        Err(..) => {
-            error!("An error occurred while deleting ");
+pub async fn delete(_zone: ZoneDelete) -> Result<bool, sqlx::Error> {
+    let query = sqlx::query!("DELETE FROM `Zones` WHERE `ID` = ?", _zone.id)
+        .execute(&get_pool().await?)
+        .await;
+    let res = match query {
+        Ok(_) => {
+            info!("Zone deleted!");
+            true
+        }
+        Err(e) => {
+            error!("Error deleting zone: {}", e);
             false
         }
     };
-    if result {
-        info!("Zone deleted!");
-    }
-    result
+    Ok(res)
 }
 
 /// Adds a new zone
@@ -426,28 +407,26 @@ pub fn delete(_zone: ZoneDelete) -> bool {
 /// }
 /// Zone::add(zone);
 /// ```
-pub fn add(_zone: ZoneAdd) -> bool {
-    let pool = get_pool();
-    let query =
-        "INSERT into `Zones` (`Name`, `Gpio`, `Time`, `AutoOff`, `Enabled`) VALUES ( ?,?,?,?,? )";
-    let result = match pool.prep_exec(
-        query,
-        (
-            _zone.name,
-            _zone.gpio,
-            _zone.time,
-            _zone.auto_off,
-            _zone.enabled,
-        ),
-    ) {
-        Ok(..) => true,
+pub async fn add(_zone: ZoneAdd) -> Result<bool, sqlx::Error> {
+    let pool = get_pool().await?;
+    let query = sqlx::query!(
+        "INSERT INTO `Zones` (Name,GPIO,Time,Enabled,AutoOff,SystemOrder) VALUES (?,?,?,?,?,?)",
+        _zone.name,
+        _zone.gpio,
+        _zone.time,
+        _zone.enabled,
+        _zone.auto_off,
+        1
+    ).execute(&pool).await;
+    let res = match query {
+        Ok(_) => {
+            info!("Zone added!");
+            true
+        }
         Err(e) => {
-            error!("An error occurred while creating a new zone: {}", e);
+            error!("Error adding zone: {}", e);
             false
         }
     };
-    if result {
-        info!("Zone created!");
-    }
-    result
+    Ok(res)
 }

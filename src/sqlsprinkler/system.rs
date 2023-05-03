@@ -1,9 +1,10 @@
-use crate::get_settings;
 use crate::sqlsprinkler::{get_pool, zone};
-use log::info;
+use log::{error, info};
 use std::{thread, time};
+use std::error::Error;
+use crate::sqlsprinkler::zone::Zone;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, sqlx::FromRow)]
 pub struct SysStatus {
     status: bool,
 }
@@ -13,13 +14,17 @@ pub struct SysStatus {
 ///     * `enabled` If true is passed in, the system is enabled. If false is used, the system is disabled.
 /// # Example
 /// ```
-/// use sqlsprinkler::system::set_status;
-/// set_status(true);
+/// use sqlsprinkler::system::set_system_status;
+/// set_system_status(true);
 /// ```
-pub fn set_system_status(enabled: bool) {
-    let pool = get_pool();
-    let query = "UPDATE Enabled set enabled = ?";
-    pool.prep_exec(query, (enabled,)).unwrap();
+pub async fn set_system_status(enabled: bool) -> Result<(), Box<dyn Error>> {
+    // let pool = get_pool();
+    // let query = "UPDATE Enabled set enabled = ?";
+    // pool.prep_exec(query, (enabled, )).unwrap();
+    sqlx::query!("UPDATE Enabled set enabled = ?", enabled)
+        .execute(&get_pool().await?)
+        .await?;
+    Ok(())
 }
 
 /// Gets whether the system schedule is enabled or disabled
@@ -30,22 +35,10 @@ pub fn set_system_status(enabled: bool) {
 /// use sqlsprinkler::system::get_system_status;
 /// let status = get_system_status();
 /// ```
-pub(crate) fn get_system_status() -> bool {
-    let pool = get_pool();
-    let query = "SELECT enabled FROM Enabled";
-    let sys_status: Vec<SysStatus> = pool
-        .prep_exec(query, ())
-        .map(|result| {
-            result
-                .map(|x| x.unwrap())
-                .map(|row| {
-                    let status = mysql::from_row(row);
-                    SysStatus { status }
-                })
-                .collect()
-        })
-        .unwrap();
-    sys_status[0].status
+pub(crate) async fn get_system_status() -> Result<bool, sqlx::Error> {
+    let rows = sqlx::query_as::<_, SysStatus>("SELECT enabled as status from Enabled")
+        .fetch_all(&get_pool().await?).await?;
+    Ok(rows[0].status)
 }
 
 /// Gets a list of all the zones in this database
@@ -56,35 +49,31 @@ pub(crate) fn get_system_status() -> bool {
 /// use sqlsprinkler::system;
 /// let zones = system::get_zones();
 /// ```
-pub(crate) fn get_zones() -> zone::ZoneList {
-    let pool = get_pool();
-    let mut conn = pool.get_conn().unwrap();
-    let query = "SELECT Name, GPIO, Time, Enabled, AutoOff, SystemOrder, ID from Zones ORDER BY SystemOrder";
-    let rows = conn.query(query).unwrap();
-    let mut zone_list: Vec<zone::Zone> = vec![];
-    for row in rows {
-        let _row = row.unwrap();
-        let zone = zone::Zone::from(_row);
-        zone_list.push(zone.clone());
+pub(crate) async fn get_zones() -> Result<zone::ZoneList, sqlx::Error> {
+    let mut rows = sqlx::query_as::<_, Zone>("SELECT * FROM Zones ORDER BY SystemOrder")
+        .fetch_all(&get_pool().await?).await?;
+    let mut res = vec![];
+    for row in rows.iter_mut() {
+        res.push(row.clone());
     }
-    info!("Got {} zones", zone_list.len());
-    zone::ZoneList { zones: zone_list }
+    Ok(zone::ZoneList { zones: res })
 }
 
 /// Runs the system based on the schedule configured. Skips over any zones that are not enabled in the database.
 /// # Example
 /// ```
 /// use sqlsprinkler::system;
-/// system::run_system();
+/// system::run();
 /// ```
-pub fn run() {
-    let zone_list = get_zones();
+pub async fn run() -> Result<(), Box<dyn Error>> {
+    let zone_list = get_zones().await?;
     for zone in &zone_list.zones {
         // Skip over zones that aren't enabled in the database.
-        if zone.enabled {
+        if zone.Enabled {
             zone.run();
         }
     }
+    Ok(())
 }
 
 /// Turns off all the zones in the system
@@ -93,12 +82,19 @@ pub fn run() {
 /// use sqlsprinkler::system;
 /// system::turn_off_all_zones();
 /// ```
-pub(crate) fn turn_off_all_zones() {
+pub(crate) async fn turn_off_all_zones() -> Result<bool, rppal::gpio::Error> {
     info!("Turning off all zones");
-    let zone_list = get_zones();
+    let zone_list = get_zones().await.unwrap();
     for zone_in_list in &zone_list.zones {
-        zone_in_list.turn_off();
+        match zone_in_list.turn_off() {
+            Ok(_) => {}
+            Err(e) => {
+                error!("Error turning off zone: {}", e);
+                return Err(e);
+            }
+        }
     }
+    Ok(true)
 }
 
 /// Winterizes the system by turning on a zone for a minute, followed by a three minute delay.
@@ -107,8 +103,8 @@ pub(crate) fn turn_off_all_zones() {
 /// use sqlsprinkler::system;
 /// system::winterize();
 /// ```
-pub(crate) fn winterize() {
-    let zone_list = get_zones();
+pub(crate) async fn winterize() -> Result<(), Box<dyn Error>> {
+    let zone_list = get_zones().await?;
     for zone in &zone_list.zones {
         zone.turn_on();
         let _zone = zone.clone();
@@ -118,4 +114,5 @@ pub(crate) fn winterize() {
         let run_time = time::Duration::from_secs(3 * 60);
         thread::sleep(run_time);
     }
+    Ok(())
 }

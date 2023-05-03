@@ -1,7 +1,6 @@
 use log::error;
 use std::process::exit;
-
-use mysql::Pool;
+use sqlx::{MySqlPool};
 
 use crate::get_settings;
 
@@ -13,7 +12,7 @@ pub mod zone;
 /// # Return
 ///     `Pool` A connection to the SQL database.
 ///
-pub(crate) fn get_pool() -> Pool {
+pub(crate) async fn get_pool() -> Result<MySqlPool, sqlx::Error> {
     // Build the url for the connection
     let reader = get_settings();
 
@@ -47,12 +46,6 @@ pub(crate) fn get_pool() -> Pool {
         reader.sqlsprinkler_host,
         reader.sqlsprinkler_db
     );
-    let pool = match Pool::new(url) {
-        Ok(p) => p,
-        Err(_e) => {
-            error!("Could not connect! Did you set the username/password correctly?");
-            exit(1);
-        }
-    };
-    pool
+    let pool = MySqlPool::connect(&url).await?;
+    Ok(pool)
 }

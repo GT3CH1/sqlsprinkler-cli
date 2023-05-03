@@ -10,20 +10,18 @@ use crate::config::{get_settings, read_settings};
 use crate::sqlsprinkler::system::{
     get_system_status, get_zones, set_system_status, turn_off_all_zones, winterize,
 };
-use crate::sqlsprinkler::zone::Zone;
+use crate::sqlsprinkler::zone::{Zone, ZoneAdd};
 use chrono::Local;
 use env_logger::fmt::{Color, Formatter};
 use env_logger::{Builder, Env};
 use log::{error, info, warn, Level, Record};
-use mysql::serde_json;
 use sqlsprinkler::daemon;
-use std::fmt;
 use std::fmt::Debug;
 use std::io::Write;
 use std::process::exit;
 use std::str::FromStr;
 use structopt::StructOpt;
-use crate::sqlsprinkler::get_pool;
+use crate::sqlsprinkler::{get_pool, zone};
 
 /// Holds the program's possible CLI options.
 #[derive(Debug, StructOpt)]
@@ -94,17 +92,6 @@ struct ZoneDelete {
 }
 
 #[derive(StructOpt, Debug)]
-struct ZoneAdd {
-    name: String,
-    gpio: u8,
-    time: u64,
-    #[structopt(parse(try_from_str))]
-    enabled: bool,
-    #[structopt(parse(try_from_str))]
-    auto_off: bool,
-}
-
-#[derive(StructOpt, Debug)]
 struct ZoneState {
     /// The ID of the zone to modify.
     id: u8,
@@ -162,8 +149,8 @@ enum SysOpts {
     Test,
 }
 
-/// Main entry point for the SQLSprinkler program.
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), sqlx::Error> {
     let cli = Opts::from_args();
 
     let daemon_mode = cli.daemon_mode;
@@ -195,17 +182,31 @@ fn main() {
 
     if daemon_mode {
         info!("Starting SQLSprinkler daemon...");
-        turn_off_all_zones();
-        daemon::run();
+        match turn_off_all_zones().await {
+            Ok(..) => (),
+            Err(e) => {
+                error!("An error occurred while turning off all zones: {}", e);
+                // exit(1);
+            }
+        }
+        std::thread::spawn(move || async move {
+            daemon::run().await;
+        });
     }
 
     if home_assistant {
         info!("Starting home assistant/mqtt integration...");
-        mqtt::mqtt_client::mqtt_run();
+        match mqtt::mqtt_client::mqtt_run().await {
+            Ok(..) => (),
+            Err(e) => {
+                error!("An error occurred while running the mqtt client: {}", e);
+                exit(1);
+            }
+        }
     }
 
     if let Some(subcommand) = cli.commands {
-        let zone_list = get_zones();
+        let zone_list = get_zones().await?;
         match subcommand {
             // `sqlsprinkler zone ...`
             Cli::Zone(zone_state) => {
@@ -223,7 +224,13 @@ fn main() {
                         };
                         match x.state.parse().unwrap() {
                             ZoneOptsArgs::On => {
-                                turn_off_all_zones();
+                                match turn_off_all_zones().await {
+                                    Ok(_) => (),
+                                    Err(e) => {
+                                        error!("An error occurred while turning off all zones: {}", e);
+                                        exit(1);
+                                    }
+                                }
                                 my_zone.turn_on();
                             }
                             ZoneOptsArgs::Off => {
@@ -235,41 +242,36 @@ fn main() {
                                 } else {
                                     "off"
                                 };
-                                info!("Zone {} ({}) is turned {}.", my_zone.id, my_zone.name, state)
+                                info!("Zone {} ({}) is turned {}.", my_zone.id, my_zone.Name, state)
                             }
                         }
                     }
                     ZoneOpts::Add(x) => {
-                        let pool = get_pool();
-                        let query = format!(
-                            "INSERT INTO Zones (name, gpio, time, enabled, autooff, systemorder) VALUES (?, ?, ?, ?, ?, ?)",
-                        );
-                        match pool.prep_exec(query, (x.name, x.gpio, x.time, x.enabled, x.auto_off, 0 as i64)) {
-                            Ok(_) => info!("Zone added successfully."),
-                            Err(e) => error!("An error occurred while adding the zone: {}", e),
-                        }
+                        zone::add(x).await?;
                     }
                     ZoneOpts::Delete(x) => {
-                        let pool = get_pool();
-                        let query = format!("DELETE FROM Zones WHERE id = {}", x.id);
-                        match pool.prep_exec(query, ()) {
+                        let query = sqlx::query!("DELETE FROM Zones WHERE id = ?", x.id)
+                            .execute(&get_pool().await?)
+                            .await;
+                        match query {
                             Ok(_) => info!("Zone deleted successfully."),
                             Err(e) => error!("An error occurred while deleting the zone: {}", e),
                         }
                     }
                     ZoneOpts::Modify(x) => {
-                        let pool = get_pool();
-                        let mut query = format!("UPDATE Zones SET name=?, gpio=?, time=?, enabled=?, autooff=?, systemorder=? WHERE id = ?");
-                        match pool.prep_exec(query, (x.name, x.gpio, x.time, x.enabled, x.auto_off, x.order, x.id)) {
+                        let query = sqlx::query!("UPDATE Zones SET name=?, gpio=?, time=?, enabled=?, autooff=?, systemorder=? WHERE id = ?", x.name, x.gpio, x.time, x.enabled, x.auto_off, x.order, x.id)
+                            .execute(&get_pool().await?)
+                            .await;
+                        match query {
                             Ok(_) => info!("Zone modified successfully."),
                             Err(e) => error!("An error occurred while modifying the zone: {}", e),
                         }
                     }
                     ZoneOpts::List => {
                         // fetch all zones and print them
-                        let list = get_zones();
+                        let list = get_zones().await?;
                         for zone in list.zones {
-                            info!("{}", zone);
+                            println!("{}", zone);
                         }
                     }
                 }
@@ -277,27 +279,64 @@ fn main() {
             // `sqlsprinkler sys ...`
             Cli::Sys(sys_opts) => match sys_opts {
                 SysOpts::On => {
-                    info!("Enabled system schedule");
-                    set_system_status(true);
+                    match set_system_status(true).await {
+                        Ok(..) => {
+                            info!("System schedule enabled successfully.");
+                        }
+                        Err(e) => {
+                            error!("An error occurred while enabling the system schedule: {}", e);
+                            exit(1);
+                        }
+                    };
                 }
                 SysOpts::Off => {
                     info!("Disabling system schedule.");
-                    set_system_status(false);
+                    match set_system_status(false).await {
+                        Ok(..) => {
+                            info!("System schedule disabled successfully.");
+                        }
+                        Err(e) => {
+                            error!("An error occurred while disabling the system schedule: {}", e);
+                            exit(1);
+                        }
+                    }
                 }
                 SysOpts::Run => {
-                    if get_system_status() {
+                    if get_system_status().await? {
                         info!("Running the system schedule.");
-                        sqlsprinkler::system::run();
+                        match sqlsprinkler::system::run().await {
+                            Ok(..) => {
+                                info!("System schedule ran successfully.");
+                            }
+                            Err(e) => {
+                                error!("An error occurred while running the system schedule: {}", e);
+                                exit(1);
+                            }
+                        };
                     } else {
                         warn!("System is not enabled, refusing.");
                     }
                 }
                 SysOpts::Winterize => {
                     info!("Winterizing the system.");
-                    winterize();
+                    match winterize().await {
+                        Ok(..) => {
+                            info!("System winterized successfully.");
+                        }
+                        Err(e) => {
+                            error!("An error occurred while winterizing the system: {}", e);
+                            exit(1);
+                        }
+                    }
                 }
                 SysOpts::Status => {
-                    let system_status = get_system_status();
+                    let system_status = match get_system_status().await {
+                        Ok(status) => status,
+                        Err(e) => {
+                            error!("An error occurred while getting the system status: {}", e);
+                            exit(1);
+                        }
+                    };
                     let output = match system_status {
                         true => "enabled",
                         false => "disabled",
@@ -305,7 +344,13 @@ fn main() {
                     info!("The system is {}", output);
                 }
                 SysOpts::Test => {
-                    turn_off_all_zones();
+                    match turn_off_all_zones().await {
+                        Ok(_) => (),
+                        Err(e) => {
+                            error!("An error occurred while turning off all zones: {}", e);
+                            exit(1);
+                        }
+                    }
                     for zone in zone_list.zones {
                         zone.test();
                     }
@@ -313,6 +358,7 @@ fn main() {
             },
         }
     }
+    Ok(())
 }
 
 fn log_formatter(buf: &mut Formatter, record: &Record) -> Result<(), std::io::Error> {
