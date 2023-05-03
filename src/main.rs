@@ -189,9 +189,18 @@ async fn main() -> Result<(), sqlx::Error> {
                 // exit(1);
             }
         }
-        std::thread::spawn(move || async move {
-            daemon::run().await;
-        });
+
+        tokio::task::spawn_blocking(|| {
+            daemon::run();
+        }).await.expect("TODO: panic message");
+        std::thread::spawn(|| {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("Unable to create a runtime");
+            let future = daemon::run();
+            runtime.block_on(future);
+        }).join().expect("TODO: panic message");
     }
 
     if home_assistant {

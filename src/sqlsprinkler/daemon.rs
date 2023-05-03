@@ -16,9 +16,8 @@ struct LengthMismatch;
 
 impl reject::Reject for LengthMismatch {}
 
-#[tokio::main]
 /// Main function for the daemon.
-pub(crate) async fn run() {
+pub async fn run() {
     info!("Starting daemon");
     // Handle get requests to /system/state -> Used to get the current state of the sys schedule
     let get_sys_status = warp::get()
