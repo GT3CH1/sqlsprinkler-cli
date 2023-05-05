@@ -14,7 +14,7 @@ use crate::sqlsprinkler::zone::{Zone, ZoneAdd};
 use chrono::Local;
 use env_logger::fmt::{Color, Formatter};
 use env_logger::{Builder, Env};
-use log::{error, info, warn, Level, Record};
+use log::{error, info, warn, Level, Record, LevelFilter};
 use sqlsprinkler::daemon;
 use std::fmt::Debug;
 use std::io::Write;
@@ -170,9 +170,13 @@ async fn main() -> Result<(), sqlx::Error> {
     //     log_level = "warn";
     // }
     create_pool().await?;
+    let mut level = "error";
+    if get_settings().verbose || verbose_mode {
+        level = "sqlsprinkler";
+    }
 
-    Builder::from_env(Env::default().default_filter_or("warn"))
-        .format(|buf, record| log_formatter(buf, record))
+    Builder::from_env(Env::default().default_filter_or(level))
+        .format(log_formatter)
         .init();
 
     if version_mode {

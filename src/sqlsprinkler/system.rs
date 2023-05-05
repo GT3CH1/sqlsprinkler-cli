@@ -24,6 +24,7 @@ pub async fn set_system_status(enabled: bool) -> Result<(), Box<dyn Error>> {
     sqlx::query!("UPDATE Enabled set enabled = ?", enabled)
         .execute(&get_pool())
         .await?;
+    info!("System status set to {}", enabled);
     Ok(())
 }
 
@@ -67,12 +68,14 @@ pub(crate) async fn get_zones() -> Result<zone::ZoneList, sqlx::Error> {
 /// ```
 pub async fn run() -> Result<(), Box<dyn Error>> {
     let zone_list = get_zones().await?;
+    info!("Running system as scheduled");
     for zone in &zone_list.zones {
         // Skip over zones that aren't enabled in the database.
         if zone.Enabled {
             zone.run();
         }
     }
+    info!("System run complete");
     Ok(())
 }
 
@@ -100,6 +103,7 @@ pub(crate) async fn turn_off_all_zones() -> Result<bool, rppal::gpio::Error> {
 pub(crate) async fn winterize() -> Result<(), Box<dyn Error>> {
     let zone_list = get_zones().await?;
     for zone in &zone_list.zones {
+        info!("Winterizing zone {}", zone.Name);
         zone.turn_on();
         let _zone = zone.clone();
         let run_time = time::Duration::from_secs(60);
@@ -107,6 +111,7 @@ pub(crate) async fn winterize() -> Result<(), Box<dyn Error>> {
         _zone.turn_off();
         let run_time = time::Duration::from_secs(3 * 60);
         thread::sleep(run_time);
+        info!("Winterized zone {}", zone.Name);
     }
     Ok(())
 }
