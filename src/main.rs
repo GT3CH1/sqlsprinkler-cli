@@ -152,7 +152,6 @@ enum SysOpts {
 #[tokio::main]
 async fn main() -> Result<(), sqlx::Error> {
     let cli = Opts::from_args();
-    create_pool().await?;
     let daemon_mode = cli.daemon_mode;
     let version_mode = cli.version_mode;
     let home_assistant = cli.home_assistant;
@@ -170,6 +169,7 @@ async fn main() -> Result<(), sqlx::Error> {
     if !verbose_mode && !get_settings().verbose {
         log_level = "warn";
     }
+    create_pool().await?;
 
     Builder::from_env(Env::default().default_filter_or(log_level))
         .format(|buf, record| log_formatter(buf, record))
@@ -193,14 +193,14 @@ async fn main() -> Result<(), sqlx::Error> {
         tokio::task::spawn_blocking(|| {
             daemon::run();
         }).await.expect("TODO: panic message");
-        std::thread::spawn(|| {
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .expect("Unable to create a runtime");
-            let future = daemon::run();
-            runtime.block_on(future);
-        }).join().expect("TODO: panic message");
+        // std::thread::spawn(|| {
+        //     let runtime = tokio::runtime::Builder::new_current_thread()
+        //         .enable_all()
+        //         .build()
+        //         .expect("Unable to create a runtime");
+        //     let future = daemon::run();
+        //     runtime.block_on(future);
+        // }).join().expect("TODO: panic message");
     }
 
     if home_assistant {
