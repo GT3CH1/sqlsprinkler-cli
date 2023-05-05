@@ -164,14 +164,14 @@ async fn main() -> Result<(), sqlx::Error> {
             exit(1)
         }
     };
-    let mut log_level = "info";
+    // let mut log_level = "info";
 
-    if !verbose_mode && !get_settings().verbose {
-        log_level = "warn";
-    }
+    // if !verbose_mode && !get_settings().verbose {
+    //     log_level = "warn";
+    // }
     create_pool().await?;
 
-    Builder::from_env(Env::default().default_filter_or(log_level))
+    Builder::from_env(Env::default().default_filter_or("warn"))
         .format(|buf, record| log_formatter(buf, record))
         .init();
 
@@ -383,7 +383,7 @@ fn log_formatter(buf: &mut Formatter, record: &Record) -> Result<(), std::io::Er
             style.set_color(Color::Yellow);
             style.set_bold(true)
         }
-        Level::Info => style.set_color(Color::White),
+        Level::Info => style.set_color(Color::Green),
         Level::Debug => style.set_color(Color::Cyan),
         Level::Trace => style.set_color(Color::Magenta),
     };

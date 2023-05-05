@@ -1,5 +1,5 @@
 use crate::sqlsprinkler::get_pool;
-use log::{error, info};
+use log::{error, info, warn};
 use rppal::gpio::{Gpio, OutputPin};
 use serde::{Deserialize, Serialize};
 use std::{fmt, process, thread, time};
@@ -43,7 +43,7 @@ impl Zone {
                 Ok(pin)
             }
             Err(e) => {
-                error!("Failed to get GPIO interface. Are you on a Raspberry Pi / running as root?");
+                warn!("Failed to acquire GPIO interface for zone {}!", self.id);
                 Err(e)
             }
         };
@@ -58,8 +58,14 @@ impl Zone {
     /// ```
     pub fn turn_on(&self) {
         info!("Turned on {}", self);
-        let mut gpio = self.get_gpio().unwrap();
-        gpio.set_low();
+        match self.get_gpio() {
+            Ok(mut gpio) => {
+                gpio.set_low();
+            }
+            Err(e) => {
+                warn!("Failed to turn on zone {}!", self.id);
+            }
+        }
     }
 
     /// Turns off this zone.
@@ -69,16 +75,14 @@ impl Zone {
     /// let zone = Zone::default();
     /// zone.turn_off();
     /// ```
-    pub fn turn_off(&self) -> Result<(), rppal::gpio::Error> {
+    pub fn turn_off(&self) {
         match self.get_gpio() {
             Ok(mut gpio) => {
                 info!("Turned off {}", self);
                 gpio.set_high();
-                Ok(())
             }
             Err(e) => {
-                error!("Failed to get GPIO interface. Are you on a Raspberry Pi / running as root?");
-                Err(e)
+                warn!("Failed to turn off zone {}", self.id);
             }
         }
     }
@@ -107,6 +111,7 @@ impl Zone {
         match self.get_gpio() {
             Ok(gpio) => gpio.is_set_low(),
             Err(e) => {
+                warn!("get_gpio failed for zone {}! Defaulting to off.", self.id);
                 false
             }
         }
@@ -122,6 +127,7 @@ impl Zone {
     pub fn test(&self) {
         info!("Testing {}", self.Name);
         self.turn_on();
+        info!("Sleeping for 12 seconds...");
         let run_time = time::Duration::from_secs(12);
         thread::sleep(run_time);
         self.turn_off();
@@ -158,9 +164,10 @@ impl Zone {
     pub fn run(&self) {
         self.turn_on();
         let _zone = self.clone();
+
         let run_time = time::Duration::from_secs((_zone.Time * 60) as u64);
         thread::sleep(run_time);
-        _zone.turn_off();
+        self.turn_off();
     }
 
     /// Updates this zone to the given `zone` parameter.
@@ -177,7 +184,7 @@ impl Zone {
     /// zone.update(new_zone);
     /// ```
     pub async fn update(&self, zone: Zone) -> Result<bool, sqlx::Error> {
-        // let query = &get_pool().prepare("UPDATE Zones SET Name=?, Gpio=?, Time=?, AutoOff=?, Enabled=? ,SystemOrder=? WHERE ID=?").into_iter();
+        // let query = get_pool().prepare("UPDATE Zones SET Name=?, Gpio=?, Time=?, AutoOff=?, Enabled=? ,SystemOrder=? WHERE ID=?").into_iter();
         let rows = sqlx::query!(
             "UPDATE Zones SET Name=?, GPIO=?, Time=?, Autooff=?, Enabled=? ,SystemOrder=? WHERE ID=?",
             zone.Name,
@@ -188,7 +195,7 @@ impl Zone {
             zone.SystemOrder,
             self.id
         ).execute(&get_pool()).await?;
-        info!("Updated zone with id {}", self.id);
+        info!("Updated zone with id {}.", self.id);
         Ok(true)
     }
 
@@ -340,8 +347,10 @@ pub async fn get_zone_from_id(zone_id: i8) -> Result<Zone, sqlx::Error> {
         .await?;
     info!("Getting row from id: {}", zone_id);
     if zones.is_empty() {
+        warn!("Default zone on get_zone_from_id: {}", zone_id);
         return Ok(Zone::default());
     }
+    info!("Got zone from id: {}", zone_id);
     Ok(zones[0].clone())
 }
 
@@ -362,7 +371,7 @@ pub async fn get_zone_from_order(zone_order: i8) -> Result<Zone, sqlx::Error> {
         .await?;
     let mut _zone = Zone::default();
     if query.len() == 0 {
-        info!("Default zone on get_zone_from_order: {}", zone_order);
+        warn!("Default zone on get_zone_from_order: {}", zone_order);
         return Ok(_zone);
     }
     Ok(query[0].clone())
