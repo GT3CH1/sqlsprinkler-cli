@@ -104,8 +104,12 @@ impl Zone {
     /// # Return
     ///     `on` A bool representing whether or not this zone is on.
     pub(self) fn is_on(&self) -> bool {
-        let gpio = self.get_gpio().unwrap();
-        gpio.is_set_low()
+        match self.get_gpio() {
+            Ok(gpio) => gpio.is_set_low(),
+            Err(e) => {
+                false
+            }
+        }
     }
 
     /// Turns the zone on for 12 seconds and then turn off.
