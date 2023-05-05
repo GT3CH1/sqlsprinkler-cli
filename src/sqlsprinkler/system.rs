@@ -86,13 +86,7 @@ pub(crate) async fn turn_off_all_zones() -> Result<bool, rppal::gpio::Error> {
     info!("Turning off all zones");
     let zone_list = get_zones().await.unwrap();
     for zone_in_list in &zone_list.zones {
-        match zone_in_list.turn_off() {
-            Ok(_) => {}
-            Err(e) => {
-                error!("Error turning off zone: {}", e);
-                return Err(e);
-            }
-        }
+        zone_in_list.turn_off();
     }
     Ok(true)
 }
