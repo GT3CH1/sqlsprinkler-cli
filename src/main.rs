@@ -21,7 +21,7 @@ use std::io::Write;
 use std::process::exit;
 use std::str::FromStr;
 use structopt::StructOpt;
-use crate::sqlsprinkler::{get_pool, zone};
+use crate::sqlsprinkler::{create_pool, get_pool, zone};
 
 /// Holds the program's possible CLI options.
 #[derive(Debug, StructOpt)]
@@ -152,7 +152,7 @@ enum SysOpts {
 #[tokio::main]
 async fn main() -> Result<(), sqlx::Error> {
     let cli = Opts::from_args();
-    create_pool().await;
+    create_pool().await?;
     let daemon_mode = cli.daemon_mode;
     let version_mode = cli.version_mode;
     let home_assistant = cli.home_assistant;
@@ -260,7 +260,7 @@ async fn main() -> Result<(), sqlx::Error> {
                     }
                     ZoneOpts::Delete(x) => {
                         let query = sqlx::query!("DELETE FROM Zones WHERE id = ?", x.id)
-                            .execute(&get_pool().await?)
+                            .execute(&get_pool())
                             .await;
                         match query {
                             Ok(_) => info!("Zone deleted successfully."),
@@ -269,7 +269,7 @@ async fn main() -> Result<(), sqlx::Error> {
                     }
                     ZoneOpts::Modify(x) => {
                         let query = sqlx::query!("UPDATE Zones SET name=?, gpio=?, time=?, enabled=?, autooff=?, systemorder=? WHERE id = ?", x.name, x.gpio, x.time, x.enabled, x.auto_off, x.order, x.id)
-                            .execute(&get_pool().await?)
+                            .execute(&get_pool())
                             .await;
                         match query {
                             Ok(_) => info!("Zone modified successfully."),

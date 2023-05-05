@@ -173,7 +173,7 @@ impl Zone {
     /// zone.update(new_zone);
     /// ```
     pub async fn update(&self, zone: Zone) -> Result<bool, sqlx::Error> {
-        // let query = get_pool().prepare("UPDATE Zones SET Name=?, Gpio=?, Time=?, AutoOff=?, Enabled=? ,SystemOrder=? WHERE ID=?").into_iter();
+        // let query = &get_pool().prepare("UPDATE Zones SET Name=?, Gpio=?, Time=?, AutoOff=?, Enabled=? ,SystemOrder=? WHERE ID=?").into_iter();
         let rows = sqlx::query!(
             "UPDATE Zones SET Name=?, GPIO=?, Time=?, Autooff=?, Enabled=? ,SystemOrder=? WHERE ID=?",
             zone.Name,
@@ -183,7 +183,7 @@ impl Zone {
             zone.Enabled,
             zone.SystemOrder,
             self.id
-        ).execute(&get_pool().await?).await?;
+        ).execute(&get_pool()).await?;
         info!("Updated zone with id {}", self.id);
         Ok(true)
     }
@@ -332,7 +332,7 @@ pub struct ZoneList {
 pub async fn get_zone_from_id(zone_id: i8) -> Result<Zone, sqlx::Error> {
     let zones = sqlx::query_as::<_, Zone>("SELECT * FROM Zones WHERE id = ?")
         .bind(zone_id)
-        .fetch_all(&get_pool().await?)
+        .fetch_all(&get_pool())
         .await?;
     info!("Getting row from id: {}", zone_id);
     if zones.is_empty() {
@@ -354,7 +354,7 @@ pub async fn get_zone_from_id(zone_id: i8) -> Result<Zone, sqlx::Error> {
 pub async fn get_zone_from_order(zone_order: i8) -> Result<Zone, sqlx::Error> {
     let query = sqlx::query_as::<_, Zone>("SELECT * FROM Zones WHERE SystemOrder = ?")
         .bind(zone_order)
-        .fetch_all(&get_pool().await?)
+        .fetch_all(&get_pool())
         .await?;
     let mut _zone = Zone::default();
     if query.len() == 0 {
@@ -377,7 +377,7 @@ pub async fn get_zone_from_order(zone_order: i8) -> Result<Zone, sqlx::Error> {
 /// ```
 pub async fn delete(_zone: ZoneDelete) -> Result<bool, sqlx::Error> {
     let query = sqlx::query!("DELETE FROM `Zones` WHERE `ID` = ?", _zone.id)
-        .execute(&get_pool().await?)
+        .execute(&get_pool())
         .await;
     let res = match query {
         Ok(_) => {
@@ -408,7 +408,7 @@ pub async fn delete(_zone: ZoneDelete) -> Result<bool, sqlx::Error> {
 /// Zone::add(zone);
 /// ```
 pub async fn add(_zone: ZoneAdd) -> Result<bool, sqlx::Error> {
-    let pool = get_pool().await?;
+    let pool = &get_pool();
     let query = sqlx::query!(
         "INSERT INTO `Zones` (Name,GPIO,Time,Enabled,AutoOff,SystemOrder) VALUES (?,?,?,?,?,?)",
         _zone.name,
@@ -417,7 +417,7 @@ pub async fn add(_zone: ZoneAdd) -> Result<bool, sqlx::Error> {
         _zone.enabled,
         _zone.auto_off,
         1
-    ).execute(&pool).await;
+    ).execute(pool).await;
     let res = match query {
         Ok(_) => {
             info!("Zone added!");

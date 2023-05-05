@@ -18,11 +18,11 @@ pub struct SysStatus {
 /// set_system_status(true);
 /// ```
 pub async fn set_system_status(enabled: bool) -> Result<(), Box<dyn Error>> {
-    // let pool = get_pool();
+    // let pool = &get_pool();
     // let query = "UPDATE Enabled set enabled = ?";
     // pool.prep_exec(query, (enabled, )).unwrap();
     sqlx::query!("UPDATE Enabled set enabled = ?", enabled)
-        .execute(&get_pool().await?)
+        .execute(&get_pool())
         .await?;
     Ok(())
 }
@@ -37,7 +37,7 @@ pub async fn set_system_status(enabled: bool) -> Result<(), Box<dyn Error>> {
 /// ```
 pub(crate) async fn get_system_status() -> Result<bool, sqlx::Error> {
     let rows = sqlx::query_as::<_, SysStatus>("SELECT enabled as status from Enabled")
-        .fetch_all(&get_pool().await?).await?;
+        .fetch_all(&get_pool()).await?;
     Ok(rows[0].status)
 }
 
@@ -51,7 +51,7 @@ pub(crate) async fn get_system_status() -> Result<bool, sqlx::Error> {
 /// ```
 pub(crate) async fn get_zones() -> Result<zone::ZoneList, sqlx::Error> {
     let mut rows = sqlx::query_as::<_, Zone>("SELECT * FROM Zones ORDER BY SystemOrder")
-        .fetch_all(&get_pool().await?).await?;
+        .fetch_all(&get_pool()).await?;
     let mut res = vec![];
     for row in rows.iter_mut() {
         res.push(row.clone());
