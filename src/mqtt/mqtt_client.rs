@@ -135,10 +135,9 @@ pub async fn mqtt_run() -> Result<(), Box<dyn Error>> {
         loop_count = (loop_count + 1) % 15;
         if loop_count == 0 {
             // broadcast
-            send_discovery_message(&mqtt_client);
+            send_discovery_message(&mqtt_client).expect("TODO: panic message");
         }
     }
-    Ok(())
 }
 
 
@@ -307,7 +306,7 @@ fn send_discovery_message(cli: &AsyncClient) -> Result<(), Box<dyn Error + '_>> 
 /// * `cli` - The mqtt client
 /// * `_msgid` - The message id (unused)
 /// * `rc` - The reason for the failure
-fn on_connect_failure(cli: &mqtt::AsyncClient, _msgid: u16, rc: i32) {
+fn on_connect_failure(cli: &AsyncClient, _msgid: u16, rc: i32) {
     println!("Connection attempt failed with error code {}.\n", rc);
     thread::sleep(Duration::from_millis(2500));
     cli.reconnect_with_callbacks(on_connect_success, on_connect_failure);
