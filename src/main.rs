@@ -152,7 +152,7 @@ enum SysOpts {
 #[tokio::main]
 async fn main() -> Result<(), sqlx::Error> {
     let cli = Opts::from_args();
-
+    create_pool().await;
     let daemon_mode = cli.daemon_mode;
     let version_mode = cli.version_mode;
     let home_assistant = cli.home_assistant;

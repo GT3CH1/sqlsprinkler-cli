@@ -1,6 +1,8 @@
 use log::error;
 use std::process::exit;
+use lazy_static::lazy_static;
 use sqlx::{MySqlPool};
+use std::sync::RwLock;
 
 use crate::get_settings;
 
@@ -8,11 +10,21 @@ pub mod daemon;
 pub mod system;
 pub mod zone;
 
+// create a static pool for the sql database
+lazy_static! {
+    static ref POOL: RwLock<Pool<MySqlPool>> = RwLock::new();
+}
+
+
+pub fn get_pool() -> &'static MySqlPool {
+    POOL.read().unwrap().as_ref()
+}
+
 /// Gets a connection to a MySQL database
 /// # Return
 ///     `Pool` A connection to the SQL database.
 ///
-pub(crate) async fn get_pool() -> Result<MySqlPool, sqlx::Error> {
+pub(crate) async fn create_pool() -> Result<(), sqlx::Error> {
     // Build the url for the connection
     let reader = get_settings();
 
@@ -47,5 +59,6 @@ pub(crate) async fn get_pool() -> Result<MySqlPool, sqlx::Error> {
         reader.sqlsprinkler_db
     );
     let pool = MySqlPool::connect(&url).await?;
-    Ok(pool)
+    POOL.write().unwrap().replace(pool);
+    Ok(())
 }
