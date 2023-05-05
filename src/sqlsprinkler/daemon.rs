@@ -1,6 +1,6 @@
-use crate::sqlsprinkler::zone::{ZoneOrder};
-use crate::sqlsprinkler::{system, zone, zone::get_zone_from_id};
-use crate::{get_system_status, set_system_status, sqlsprinkler, turn_off_all_zones};
+use crate::sqlsprinkler::zone::{Zone, ZoneList, ZoneOrder};
+use crate::sqlsprinkler::{zone, zone::get_zone_from_id};
+use crate::{get_system_status, set_system_status, turn_off_all_zones};
 use log::{error, info};
 use serde::{Deserialize, Serialize};
 use warp::{http, reject, Filter};
@@ -40,6 +40,15 @@ pub async fn run() {
         .and(warp::path("info"))
         .and(warp::path::end())
         .and_then(get_zone_status);
+
+    // check zone state at /zone/info/{id}
+
+    let check_zone_state = warp::get()
+        .and(warp::path("zone"))
+        .and(warp::path("info"))
+        .and(warp::path::param::<u32>())
+        .and(warp::path::end())
+        .and_then(check_zone_state);
 
     // Handle put requests to /zone -> Used for TOGGLING a zone.
     let set_zone_status = warp::put()
@@ -83,6 +92,7 @@ pub async fn run() {
         .or(get_zone_status)
         .or(set_zone_status)
         .or(add_zone)
+        .or(check_zone_state)
         .or(delete_zone)
         .or(update_zone)
         .or(update_order);
@@ -96,7 +106,7 @@ fn sys_status_put_json() -> impl Filter<Extract=(SysStatus, ), Error=warp::Rejec
 }
 
 /// Used to filter a put request to toggle a specific zone.
-fn zone_status_put_json() -> impl Filter<Extract=(sqlsprinkler::zone::ZoneToggle, ), Error=warp::Rejection> + Clone {
+fn zone_status_put_json() -> impl Filter<Extract=(zone::ZoneToggle, ), Error=warp::Rejection> + Clone {
     warp::body::content_length_limit(1024 * 16).and(warp::body::json())
 }
 
@@ -112,13 +122,26 @@ fn zone_delete_json() -> impl Filter<Extract=(zone::ZoneDelete, ), Error=warp::R
 }
 
 /// Used to filter a put request to update a zone.
-fn zone_json() -> impl Filter<Extract=(zone::Zone, ), Error=warp::Rejection> + Clone {
+fn zone_json() -> impl Filter<Extract=(Zone, ), Error=warp::Rejection> + Clone {
     warp::body::content_length_limit(1024 * 16).and(warp::body::json())
 }
 
 /// Used to filter a put request to re-order the system
 fn order_json() -> impl Filter<Extract=(ZoneOrder, ), Error=warp::Rejection> + Clone {
     warp::body::content_length_limit(1024 * 16).and(warp::body::json())
+}
+
+
+async fn check_zone_state(id: u32) -> Result<impl warp::Reply, warp::Rejection> {
+    match get_zone_from_id(id as i8).await {
+        Ok(z) => {
+            Ok(warp::reply::json(&z.get_with_state()))
+        }
+        Err(e) => {
+            error!("Error getting zone from id: {}", e);
+            return Err(reject::not_found());
+        }
+    }
 }
 
 /// Gets the system status
@@ -129,7 +152,7 @@ async fn get_sys_status() -> Result<impl warp::Reply, warp::Rejection> {
         Ok(status) => status,
         Err(e) => {
             error!("Error getting system status: {}", e);
-            return Err(warp::reject::not_found());
+            return Err(reject::not_found());
         }
     };
     let value = SysStatus {
@@ -146,20 +169,14 @@ async fn set_sys_status(_status: SysStatus) -> Result<impl warp::Reply, warp::Re
         Ok(_) => Ok(warp::reply::with_status("Success", http::StatusCode::OK)),
         Err(e) => {
             error!("Error setting system status: {}", e);
-            Err(warp::reject::not_found())
+            Err(reject::not_found())
         }
     };
 }
 
 /// Gets the status of all the zones.
 async fn get_zone_status() -> Result<impl warp::Reply, warp::Rejection> {
-    let zone_list = match get_zones().await {
-        Ok(list) => list,
-        Err(e) => {
-            error!("Error getting zone list: {}", e);
-            return Err(warp::reject::not_found());
-        }
-    };
+    let zone_list = get_zone_list().await?;
     let mut zone_status_list: Vec<zone::ZoneWithState> = Vec::new();
     for zone in zone_list.zones.iter() {
         let _zone = &zone;
@@ -167,6 +184,16 @@ async fn get_zone_status() -> Result<impl warp::Reply, warp::Rejection> {
         zone_status_list.push(zone_with_status);
     }
     Ok(warp::reply::json(&zone_status_list))
+}
+
+async fn get_zone_list() -> Result<ZoneList, warp::Rejection> {
+    match get_zones().await {
+        Ok(list) => Ok(list),
+        Err(e) => {
+            error!("Error getting zone list: {}", e);
+            Err(reject::not_found())
+        }
+    }
 }
 
 /// Sets the id of the zone to the given state -> IE, turning on a zone.
@@ -178,7 +205,7 @@ async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, wa
         Ok(zone) => zone,
         Err(e) => {
             error!("Error getting zone from id: {}", e);
-            return Err(warp::reject::not_found());
+            return Err(reject::not_found());
         }
     };
     if state {
@@ -194,7 +221,7 @@ async fn set_zone_status(_zone: zone::ZoneToggle) -> Result<impl warp::Reply, wa
             Ok(..) => {}
             Err(e) => {
                 error!("Error turning off all zones: {}", e);
-                return Ok(warp::reply::with_status("Error", http::StatusCode::INTERNAL_SERVER_ERROR));
+                // return Ok(warp::reply::with_status("Error", http::StatusCode::INTERNAL_SERVER_ERROR));
             }
         }
         zone.run_async();
@@ -217,7 +244,7 @@ async fn _add_zone(_zone: zone::ZoneAdd) -> Result<impl warp::Reply, warp::Rejec
         }
         Err(e) => {
             error!("Error adding zone: {}", e);
-            Err(warp::reject::reject())
+            Err(reject::reject())
         }
     }
 }
@@ -235,7 +262,7 @@ async fn _delete_zone(_zone: zone::ZoneDelete) -> Result<impl warp::Reply, warp:
         }
         Err(e) => {
             error!("Error deleting zone: {}", e);
-            Err(warp::reject::reject())
+            Err(reject::reject())
         }
     }
 }
@@ -243,12 +270,12 @@ async fn _delete_zone(_zone: zone::ZoneDelete) -> Result<impl warp::Reply, warp:
 /// Updates a zone
 /// # Params
 ///     * `_zone` The zone we want to update.
-async fn _update_zone(_zone: zone::Zone) -> Result<impl warp::Reply, warp::Rejection> {
+async fn _update_zone(_zone: Zone) -> Result<impl warp::Reply, warp::Rejection> {
     let zone = match get_zone_from_id(_zone.id).await {
         Ok(zone) => zone,
         Err(e) => {
             error!("Error getting zone: {}", e);
-            return Err(warp::reject::not_found());
+            return Err(reject::not_found());
         }
     };
     return match zone.update(_zone).await {
@@ -259,7 +286,7 @@ async fn _update_zone(_zone: zone::Zone) -> Result<impl warp::Reply, warp::Rejec
         }
         Err(e) => {
             error!("Error updating zone: {}", e);
-            Err(warp::reject::reject())
+            Err(reject::reject())
         }
     };
 }
@@ -267,24 +294,18 @@ async fn _update_zone(_zone: zone::Zone) -> Result<impl warp::Reply, warp::Rejec
 /// Updates the order of all zones in the system
 /// # Params
 ///     * `_order` The new ordering of the system
-async fn _update_order(_order: zone::ZoneOrder) -> Result<impl warp::Reply, warp::Rejection> {
-    let zone_list = match system::get_zones().await {
-        Ok(list) => list,
-        Err(e) => {
-            error!("Error getting zone list: {}", e);
-            return Err(warp::reject::not_found());
-        }
-    };
+async fn _update_order(_order: ZoneOrder) -> Result<impl warp::Reply, warp::Rejection> {
+    let zone_list = get_zone_list().await?;
     let mut counter = 0;
-    if zone_list.zones.len() == _order.order.len() {
+    return if zone_list.zones.len() == _order.order.len() {
         for zone in zone_list.zones.iter() {
             let mut _zone = &zone;
             let new_order = _order.order.as_slice()[counter];
             _zone.set_order(new_order).await;
             counter += 1;
         }
-        return Ok(warp::reply::with_status("ok", http::StatusCode::OK));
+        Ok(warp::reply::with_status("ok", http::StatusCode::OK))
     } else {
-        return Err(reject::custom(LengthMismatch));
-    }
+        Err(reject::custom(LengthMismatch))
+    };
 }
