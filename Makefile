@@ -1,5 +1,5 @@
 UNAME := $(shell uname -m)
-VERSION := 0.1-6
+VERSION := 0.1-7
 ROOT := sqlsprinkler_$(VERSION)_$(ARCH)
 default:
 	$(MAKE) build
