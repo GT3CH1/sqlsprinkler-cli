@@ -2,24 +2,17 @@ use crate::sqlsprinkler::get_pool;
 use log::{error, info, warn};
 use rppal::gpio::{Gpio, OutputPin};
 use serde::{Deserialize, Serialize};
-use std::{fmt, process, thread, time};
+use std::{fmt, thread, time};
 use structopt::StructOpt;
 
 /// Represents a SQLSprinkler zone.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, sqlx::FromRow)]
-#[allow(non_snake_case)]
 pub struct Zone {
-    #[allow(non_snake_case)]
     pub Name: String,
-    #[allow(non_snake_case)]
     pub GPIO: i8,
-    #[allow(non_snake_case)]
     pub Time: i64,
-    #[allow(non_snake_case)]
     pub Enabled: bool,
-    #[allow(non_snake_case)]
     pub Autooff: bool,
-    #[allow(non_snake_case)]
     pub SystemOrder: i8,
     pub id: i8,
 }
@@ -62,7 +55,7 @@ impl Zone {
             Ok(mut gpio) => {
                 gpio.set_low();
             }
-            Err(e) => {
+            Err(_e) => {
                 warn!("Failed to turn on zone {}!", self.id);
             }
         }
@@ -81,7 +74,7 @@ impl Zone {
                 info!("Turned off {}", self);
                 gpio.set_high();
             }
-            Err(e) => {
+            Err(_e) => {
                 warn!("Failed to turn off zone {}", self.id);
             }
         }
@@ -110,7 +103,7 @@ impl Zone {
     pub(self) fn is_on(&self) -> bool {
         match self.get_gpio() {
             Ok(gpio) => gpio.is_set_low(),
-            Err(e) => {
+            Err(_e) => {
                 warn!("get_gpio failed for zone {}! Defaulting to off.", self.id);
                 false
             }
@@ -185,7 +178,7 @@ impl Zone {
     /// ```
     pub async fn update(&self, zone: Zone) -> Result<bool, sqlx::Error> {
         // let query = get_pool().prepare("UPDATE Zones SET Name=?, Gpio=?, Time=?, AutoOff=?, Enabled=? ,SystemOrder=? WHERE ID=?").into_iter();
-        let rows = sqlx::query!(
+        sqlx::query!(
             "UPDATE Zones SET Name=?, GPIO=?, Time=?, Autooff=?, Enabled=? ,SystemOrder=? WHERE ID=?",
             zone.Name,
             zone.GPIO,
@@ -262,13 +255,7 @@ impl fmt::Display for Zone {
         write!(
             f,
             "Name: {} | Gpio: {} | Time: {} | Enabled: {} | AutoOff: {} | Order: {} | Id: {}",
-            self.Name,
-            self.GPIO,
-            self.Time,
-            self.Enabled,
-            self.Autooff,
-            self.SystemOrder,
-            self.id
+            self.Name, self.GPIO, self.Time, self.Enabled, self.Autooff, self.SystemOrder, self.id
         )
     }
 }
@@ -354,7 +341,7 @@ pub async fn get_zone_from_id(zone_id: i8) -> Result<Zone, sqlx::Error> {
     Ok(zones[0].clone())
 }
 
-/// Gets a zone from the given id
+/// Gets a zone from the given id - DEPRECATED
 /// # Params
 ///     `zone_id` The id of the zone we want to get
 /// # Return
@@ -430,7 +417,9 @@ pub async fn add(_zone: ZoneAdd) -> Result<bool, sqlx::Error> {
         _zone.enabled,
         _zone.auto_off,
         1
-    ).execute(pool).await;
+    )
+    .execute(pool)
+    .await;
     let res = match query {
         Ok(_) => {
             info!("Zone added!");

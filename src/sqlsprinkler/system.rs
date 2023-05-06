@@ -1,5 +1,5 @@
 use crate::sqlsprinkler::{get_pool, zone};
-use log::{error, info};
+use log::info;
 use std::{thread, time};
 use std::error::Error;
 use crate::sqlsprinkler::zone::Zone;

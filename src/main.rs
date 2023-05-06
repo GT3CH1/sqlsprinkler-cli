@@ -3,18 +3,17 @@
 extern crate core;
 
 mod config;
-mod mqtt;
 mod sqlsprinkler;
 
 use crate::config::{get_settings, read_settings};
 use crate::sqlsprinkler::system::{
     get_system_status, get_zones, set_system_status, turn_off_all_zones, winterize,
 };
-use crate::sqlsprinkler::zone::{Zone, ZoneAdd};
+use crate::sqlsprinkler::zone::ZoneAdd;
 use chrono::Local;
 use env_logger::fmt::{Color, Formatter};
 use env_logger::{Builder, Env};
-use log::{error, info, warn, Level, Record, LevelFilter};
+use log::{error, info, warn, Level, Record};
 use sqlsprinkler::daemon;
 use std::fmt::Debug;
 use std::io::Write;
@@ -42,14 +41,6 @@ pub struct Opts {
     about = "Launches the SQLSprinkler API web daemon."
     )]
     daemon_mode: bool,
-
-    /// Whether or not to run in home assistant mode using MQTT
-    #[structopt(
-    short = "m",
-    long = "home-assistant",
-    about = "Broadcasts the current system to home assistant."
-    )]
-    home_assistant: bool,
 
     /// A list of sub commands to run
     #[structopt(subcommand)]
@@ -154,7 +145,6 @@ async fn main() -> Result<(), sqlx::Error> {
     let cli = Opts::from_args();
     let daemon_mode = cli.daemon_mode;
     let version_mode = cli.version_mode;
-    let home_assistant = cli.home_assistant;
     let verbose_mode = cli.verbose_mode;
 
     match read_settings() {
@@ -205,17 +195,6 @@ async fn main() -> Result<(), sqlx::Error> {
             let future = daemon::run();
             runtime.block_on(future);
         }).join().expect("TODO: panic message");
-    }
-
-    if home_assistant {
-        info!("Starting home assistant/mqtt integration...");
-        match mqtt::mqtt_client::mqtt_run().await {
-            Ok(..) => (),
-            Err(e) => {
-                error!("An error occurred while running the mqtt client: {}", e);
-                exit(1);
-            }
-        }
     }
 
     if let Some(subcommand) = cli.commands {

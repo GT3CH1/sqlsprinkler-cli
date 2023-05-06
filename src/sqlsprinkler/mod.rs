@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 use log::error;
 use std::process::exit;
 use lazy_static::lazy_static;
