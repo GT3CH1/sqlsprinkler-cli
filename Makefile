@@ -63,4 +63,4 @@ Architecture: armhf\n\
 Maintainer: Gavin Pease <gavinpease@gmail.com>\n\
 Description: The command line and daemon for sqlsprinkler" > $(ROOT)/DEBIAN/control
 	@chmod 755 -R $(ROOT)/DEBIAN
-	@dpkg-deb --build --root-owner-group $(ROOT)
+	@dpkg-deb -Zxz --build --root-owner-group $(ROOT)
